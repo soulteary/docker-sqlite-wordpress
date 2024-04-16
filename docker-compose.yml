@@ -1,0 +1,11 @@
+version: '3'
+
+services:
+
+  wordpress:
+    image: soulteary/sqlite-wordpress:6.5.2
+    restart: always
+    ports:
+      - 8080:80
+    volumes:
+      - ./wordpress:/var/www/html
