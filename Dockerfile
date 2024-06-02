@@ -1,11 +1,11 @@
-FROM wordpress:6.5.2-php8.3-apache
+FROM wordpress:6.5.3-php8.3-apache
 LABEL org.opencontainers.image.authors="soulteary@gmail.com"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV WORDPRESS_PREPARE_DIR=/usr/src/wordpress
 
 # plugin: https://github.com/WordPress/sqlite-database-integration
-ENV SQLITE_DATABASE_INTEGRATION_VERSION=2.1.9
+ENV SQLITE_DATABASE_INTEGRATION_VERSION=2.1.11
 # details: https://soulteary.com/2024/04/21/wordpress-sqlite-docker-image-packaging-details.html
 RUN curl -L -o sqlite-database-integration.tar.gz "https://github.com/WordPress/sqlite-database-integration/archive/refs/tags/v${SQLITE_DATABASE_INTEGRATION_VERSION}.tar.gz" && \
     tar zxvf sqlite-database-integration.tar.gz && \
