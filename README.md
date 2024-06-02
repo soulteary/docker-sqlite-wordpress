@@ -20,7 +20,7 @@ You can download GitHub's clean and secure docker image using the following comm
 # use latest
 docker pull soulteary/sqlite-wordpress
 # use specify version
-docker pull soulteary/sqlite-wordpress:6.5.2
+docker pull soulteary/sqlite-wordpress:6.5.3
 ```
 
 Use the following command to quickly launch the wordpress with port `8080`:
@@ -37,7 +37,7 @@ version: '3'
 services:
 
   wordpress:
-    image: soulteary/sqlite-wordpress:6.5.2
+    image: soulteary/sqlite-wordpress:6.5.3
     restart: always
     ports:
       - 8080:80
