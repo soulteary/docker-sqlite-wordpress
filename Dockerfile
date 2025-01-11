@@ -1,4 +1,4 @@
-FROM wordpress:6.7.1-php8.1-fpm-alpine
+FROM wordpress:6.7.1-php8.3-apache
 LABEL org.opencontainers.image.authors="soulteary@gmail.com"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
