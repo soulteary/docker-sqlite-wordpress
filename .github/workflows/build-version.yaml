@@ -7,7 +7,7 @@ on:
       - "*.*.*"
 
 env:
-  REGISTRY_IMAGE: soulteary/sqlite-wordpress
+  REGISTRY_IMAGE: mpielikis/sqlite-wordpress
 
 jobs:
   docker:
