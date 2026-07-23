@@ -21,11 +21,11 @@ You can download GitHub's clean and secure docker image using the following comm
 # Docker Hub: use latest
 docker pull soulteary/sqlite-wordpress
 # Docker Hub: use specify version
-docker pull soulteary/sqlite-wordpress:6.9.1
+docker pull soulteary/sqlite-wordpress:7.0.2
 # GHCR: use latest
 docker pull ghcr.io/soulteary/sqlite-wordpress:latest
 # GHCR: use specify version
-docker pull ghcr.io/soulteary/sqlite-wordpress:6.9.1
+docker pull ghcr.io/soulteary/sqlite-wordpress:7.0.2
 ```
 
 Use the following command to quickly launch the wordpress with port `8080`:
@@ -44,8 +44,8 @@ version: '3'
 services:
 
   wordpress:
-    image: soulteary/sqlite-wordpress:6.9.1
-    # or use: ghcr.io/soulteary/sqlite-wordpress:6.9.1
+    image: soulteary/sqlite-wordpress:7.0.2
+    # or use: ghcr.io/soulteary/sqlite-wordpress:7.0.2
     restart: always
     ports:
       - 8080:80
