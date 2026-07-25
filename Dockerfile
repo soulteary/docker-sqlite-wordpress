@@ -43,8 +43,14 @@ COPY --from=ext-builder /plugin ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/s
 RUN mv "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration/db.copy" "${WORDPRESS_PREPARE_DIR}/wp-content/db.php" && \
     sed -i 's#{SQLITE_IMPLEMENTATION_FOLDER_PATH}#/var/www/html/wp-content/mu-plugins/sqlite-database-integration#' "${WORDPRESS_PREPARE_DIR}/wp-content/db.php" && \
     sed -i 's#{SQLITE_PLUGIN}#sqlite-database-integration/load.php#' "${WORDPRESS_PREPARE_DIR}/wp-content/db.php" && \
-    mkdir "${WORDPRESS_PREPARE_DIR}/wp-content/database" && \
+    mkdir -p "${WORDPRESS_PREPARE_DIR}/wp-content/database" \
+             "${WORDPRESS_PREPARE_DIR}/wp-content/plugins" \
+             "${WORDPRESS_PREPARE_DIR}/wp-content/themes" \
+             "${WORDPRESS_PREPARE_DIR}/wp-content/uploads" \
+             "${WORDPRESS_PREPARE_DIR}/wp-content/upgrade" && \
     touch "${WORDPRESS_PREPARE_DIR}/wp-content/database/.ht.sqlite" && \
+    chown -R www-data:www-data "${WORDPRESS_PREPARE_DIR}/wp-content" && \
+    find "${WORDPRESS_PREPARE_DIR}/wp-content" -type d -exec chmod 755 {} + && \
     chmod 640 "${WORDPRESS_PREPARE_DIR}/wp-content/database/.ht.sqlite"
 
 # Enable the native MySQL parser extension. The plugin auto-detects the
