@@ -19,6 +19,18 @@ Verify it is loaded inside the container:
 docker exec -it <container> php -m | grep wp_mysql_parser
 ```
 
+## SELECT id Key Case Fix
+
+The image also bundles a small companion must-use plugin, `sqlite-select-id-key-fix.php`, dropped into `wp-content/mu-plugins/`. WordPress auto-loads files in the mu-plugins root, so it is always active and cannot be accidentally disabled.
+
+It works around a difference between MySQL and SQLite: MySQL echoes back the identifier casing written in the query (e.g. `SELECT P.id` yields the key `id`), while SQLite returns the real declared column name (e.g. `ID`) for an un-aliased column. That mismatch leaves `$item['id']` / `$row->id` empty in some code paths. The plugin conservatively restores the written casing for safe single-table `SELECT` results (`ARRAY_A` / `OBJECT`), leaving anything it cannot fully reason about untouched.
+
+Verify it is present inside the container:
+
+```bash
+docker exec -it <container> ls -l /var/www/html/wp-content/mu-plugins/
+```
+
 ## Articles
 
 - [WordPress SQLite Docker image packaging details](https://soulteary.com/2024/04/21/wordpress-sqlite-docker-image-packaging-details.html)
