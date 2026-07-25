@@ -7,6 +7,17 @@ WordPress with SQLite, ready to use out of the box.
 - Based on [official image](https://hub.docker.com/_/wordpress), Easier and more sustainable solution.
 - DockerHub Page: https://hub.docker.com/r/soulteary/sqlite-wordpress
 - GHCR Page: https://github.com/soulteary/docker-sqlite-wordpress/pkgs/container/sqlite-wordpress
+- Ships the optional native [`wp_mysql_parser`](https://wordpress.github.io/sqlite-database-integration/native-extension/) PHP extension for a faster MySQL lexer/parser path.
+
+## Native MySQL Parser Extension
+
+The image bundles [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration) `3.0.0-rc.7` together with its optional native Rust extension `wp_mysql_parser`, which is compiled during the Docker build and enabled by default. The SQLite driver automatically detects the extension and switches to the native fast path (roughly 4.8x faster lexer and 15.5x faster parser per upstream benchmarks).
+
+Verify it is loaded inside the container:
+
+```bash
+docker exec -it <container> php -m | grep wp_mysql_parser
+```
 
 ## Articles
 
