@@ -84,34 +84,21 @@ Use the quick 1-minute initial installation, enjoy.
 
 ### Volume / upgrade note
 
-The official WordPress entrypoint only seeds the mounted volume from the
-image's `/usr/src/wordpress` when the volume is empty — specifically when it is
-missing `index.php` / `wp-includes/version.php`. This means the bundled
-`wp-content/db.php` (the SQLite drop-in) is copied **only on a fresh volume**.
+This image is **self-healing**: its entrypoint reconciles the SQLite drop-in
+(`wp-content/db.php`) and the SQLite must-use plugins into the live document
+root on **every** container start, regardless of the mounted volume's state.
 
-If you mount an **old, already-initialized** `./wordpress` volume (for example
-one created by a previous image version), the entrypoint will **not** refresh
-`wp-content/db.php`, so the new SQLite drop-in never takes effect and WordPress
-falls back to MySQL — which surfaces as a database connection error.
+This matters because the stock WordPress entrypoint only seeds a mounted volume
+from the image's `/usr/src/wordpress` when the volume looks empty (missing
+`index.php` / `wp-includes/version.php`). An **old, already-initialized**
+`./wordpress` volume (for example one created by a previous image version, or a
+reused named volume) would otherwise **never** receive the SQLite drop-in, so
+WordPress would fall back to MySQL and show "Error establishing a database
+connection". The bundled entrypoint fixes this by copying `db.php` and the
+SQLite mu-plugins in on start when they are missing or stale — no manual volume
+reset is required when upgrading.
 
-When upgrading the image, reset/recreate the volume so the new `db.php` is
-seeded:
-
-```bash
-# stop the stack first
-docker compose down
-
-# option A: remove the local bind-mount directory
-rm -rf ./wordpress
-
-# option B: if you use a named volume instead of ./wordpress
-docker volume rm <your_wordpress_volume>
-
-# then start fresh
-docker compose up
-```
-
-Verify the SQLite drop-in is actually present inside the container:
+Verify the SQLite drop-in is present inside the container:
 
 ```bash
 docker exec -it <container> ls -l /var/www/html/wp-content/db.php

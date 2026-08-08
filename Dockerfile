@@ -74,6 +74,14 @@ COPY sqlite-select-id-key-fix.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins
 # via wp-content/db.php and does not depend on this loader.
 COPY sqlite-database-integration-loader.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration-loader.php
 
+# Self-healing entrypoint: the stock WordPress entrypoint only seeds a mounted
+# volume when it is empty, so an already-initialized/old volume never receives
+# the SQLite drop-in (wp-content/db.php) and WordPress falls back to MySQL
+# ("Error establishing a database connection"). This wrapper reconciles the
+# SQLite drop-in + mu-plugins into the live docroot on every start.
+COPY docker-entrypoint-sqlite.sh /usr/local/bin/docker-entrypoint-sqlite.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint-sqlite.sh
+
 RUN mv "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration/db.copy" "${WORDPRESS_PREPARE_DIR}/wp-content/db.php" && \
     sed -i 's#{SQLITE_IMPLEMENTATION_FOLDER_PATH}#/var/www/html/wp-content/mu-plugins/sqlite-database-integration#' "${WORDPRESS_PREPARE_DIR}/wp-content/db.php" && \
     sed -i 's#{SQLITE_PLUGIN}#sqlite-database-integration/load.php#' "${WORDPRESS_PREPARE_DIR}/wp-content/db.php" && \
@@ -111,3 +119,8 @@ RUN if [ -s /usr/local/lib/php/extensions/wp_mysql_parser.so ]; then \
       echo "Native wp_mysql_parser extension not built for this platform; using PHP fallback." && \
       rm -f /usr/local/lib/php/extensions/wp_mysql_parser.so ; \
     fi
+
+# Wrap the stock entrypoint so the SQLite drop-in is (re)installed on any volume
+# state; CMD stays the base image's apache2-foreground.
+ENTRYPOINT ["docker-entrypoint-sqlite.sh"]
+CMD ["apache2-foreground"]
