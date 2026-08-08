@@ -11,7 +11,7 @@ WordPress with SQLite, ready to use out of the box.
 
 ## Native MySQL Parser Extension
 
-The image bundles [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration) `3.0.0-rc.7` together with its optional native Rust extension `wp_mysql_parser`, which is compiled during the Docker build and enabled by default. The SQLite driver automatically detects the extension and switches to the native fast path (roughly 4.8x faster lexer and 15.5x faster parser per upstream benchmarks).
+The image bundles [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration) `7.0.2-plugin-v3.0.0-rc.8` together with its optional native Rust extension `wp_mysql_parser`, which is compiled during the Docker build and enabled by default. The SQLite driver automatically detects the extension and switches to the native fast path (roughly 4.8x faster lexer and 15.5x faster parser per upstream benchmarks).
 
 Verify it is loaded inside the container:
 
