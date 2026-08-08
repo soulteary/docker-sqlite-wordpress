@@ -81,3 +81,7 @@ Save the file as `docker-compose.yml` and then execute `docker compose up`, then
 ![](.github/ready-to-use.jpg)
 
 Use the quick 1-minute initial installation, enjoy.
+
+## Contributing
+
+Contributions are welcome! Please read the [Contributing Guide](./CONTRIBUTING.md) and the [Code of Conduct](./CODE_OF_CONDUCT.md) before getting started.
