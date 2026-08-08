@@ -66,6 +66,14 @@ COPY --from=ext-builder /plugin ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/s
 # in the mu-plugins root are auto-loaded and cannot be deactivated.
 COPY sqlite-select-id-key-fix.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-select-id-key-fix.php
 
+# mu-plugins only auto-loads .php files in the mu-plugins root; it does NOT
+# recurse into subdirectories, so the plugin's own
+# sqlite-database-integration/load.php is never executed on its own. This
+# root-level loader requires that load.php to mount its admin UI (the SQLite
+# health-check / settings page under Settings). The SQLite driver itself loads
+# via wp-content/db.php and does not depend on this loader.
+COPY sqlite-database-integration-loader.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration-loader.php
+
 RUN mv "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration/db.copy" "${WORDPRESS_PREPARE_DIR}/wp-content/db.php" && \
     sed -i 's#{SQLITE_IMPLEMENTATION_FOLDER_PATH}#/var/www/html/wp-content/mu-plugins/sqlite-database-integration#' "${WORDPRESS_PREPARE_DIR}/wp-content/db.php" && \
     sed -i 's#{SQLITE_PLUGIN}#sqlite-database-integration/load.php#' "${WORDPRESS_PREPARE_DIR}/wp-content/db.php" && \
@@ -78,6 +86,20 @@ RUN mv "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integrati
     chown -R www-data:www-data "${WORDPRESS_PREPARE_DIR}/wp-content" && \
     find "${WORDPRESS_PREPARE_DIR}/wp-content" -type d -exec chmod 755 {} + && \
     chmod 640 "${WORDPRESS_PREPARE_DIR}/wp-content/database/.ht.sqlite"
+
+# Fail the build (instead of silently shipping a broken drop-in) if the upstream
+# layout changes: the SQLite loader must be present, its `../database` sibling
+# (a symlink upstream) must be materialized, the query-monitor integration
+# boot.php required by wp-includes/sqlite/db.php must exist, the generated
+# db.php must define SQLITE_DB_DROPIN_VERSION (so constants.php selects the
+# sqlite engine and activate.php never overwrites it), and the db.php
+# placeholder must have been replaced so it never falls back to the wrong
+# `plugins/` path (see #478).
+RUN test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration/wp-includes/sqlite/db.php" && \
+    test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration/wp-includes/database/load.php" && \
+    test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration/integrations/query-monitor/boot.php" && \
+    grep -q 'SQLITE_DB_DROPIN_VERSION' "${WORDPRESS_PREPARE_DIR}/wp-content/db.php" && \
+    ! grep -q '{SQLITE_IMPLEMENTATION_FOLDER_PATH}' "${WORDPRESS_PREPARE_DIR}/wp-content/db.php"
 
 # Enable the native MySQL parser extension when it was actually built.
 # On platforms where the build was skipped, the copied file is empty (a

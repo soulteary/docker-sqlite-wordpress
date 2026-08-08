@@ -82,6 +82,41 @@ Save the file as `docker-compose.yml` and then execute `docker compose up`, then
 
 Use the quick 1-minute initial installation, enjoy.
 
+### Volume / upgrade note
+
+The official WordPress entrypoint only seeds the mounted volume from the
+image's `/usr/src/wordpress` when the volume is empty — specifically when it is
+missing `index.php` / `wp-includes/version.php`. This means the bundled
+`wp-content/db.php` (the SQLite drop-in) is copied **only on a fresh volume**.
+
+If you mount an **old, already-initialized** `./wordpress` volume (for example
+one created by a previous image version), the entrypoint will **not** refresh
+`wp-content/db.php`, so the new SQLite drop-in never takes effect and WordPress
+falls back to MySQL — which surfaces as a database connection error.
+
+When upgrading the image, reset/recreate the volume so the new `db.php` is
+seeded:
+
+```bash
+# stop the stack first
+docker compose down
+
+# option A: remove the local bind-mount directory
+rm -rf ./wordpress
+
+# option B: if you use a named volume instead of ./wordpress
+docker volume rm <your_wordpress_volume>
+
+# then start fresh
+docker compose up
+```
+
+Verify the SQLite drop-in is actually present inside the container:
+
+```bash
+docker exec -it <container> ls -l /var/www/html/wp-content/db.php
+```
+
 ## Contributing
 
 Contributions are welcome! Please read the [Contributing Guide](./CONTRIBUTING.md) and the [Code of Conduct](./CODE_OF_CONDUCT.md) before getting started.
