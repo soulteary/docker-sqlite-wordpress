@@ -24,7 +24,26 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/*
+ * Two integration paths are supported because the SQLite driver's internals
+ * changed across plugin versions:
+ *
+ *  - Older releases (<= 3.0.0-rc.7) route every query through
+ *    WP_SQLite_Translator and expose the `pre_query_sqlite_db` filter, which
+ *    lets us intercept and rewrite the *result set* directly.
+ *
+ *  - 3.0.0-rc.8+ replaced that with a wpdb-style WP_SQLite_DB whose result
+ *    fetching is not filterable; the only query-time hook left is the standard
+ *    `query` filter, which can only rewrite the *SQL statement*. There we add
+ *    an explicit quoted alias (e.g. `P.id` -> `P.id AS "id"`) so SQLite echoes
+ *    the written casing back as the column key.
+ *
+ * Registering both is safe: rc.8 never fires `pre_query_sqlite_db`, and on the
+ * older path the `query` rewrite is idempotent (once aliased, the result-set
+ * rename becomes a no-op because the keys already match).
+ */
 add_filter( 'pre_query_sqlite_db', 'sqlite_select_id_key_fix', 10, 5 );
+add_filter( 'query', 'sqlite_select_id_key_fix_rewrite_query', 10, 1 );
 
 /**
  * Intercepts safe single-table SELECT queries and restores the column-name
@@ -90,6 +109,40 @@ function sqlite_select_id_key_fix( $result, $translator, $statement, $mode, $fet
  * @return null|array<string,string> Map keyed by lowercased returned key.
  */
 function sqlite_select_id_key_fix_build_rename_map( $statement ) {
+	$columns = sqlite_select_id_key_fix_parse_select( $statement );
+	if ( null === $columns ) {
+		return null;
+	}
+
+	$rename_map = array();
+	foreach ( $columns as $column ) {
+		$written = sqlite_select_id_key_fix_column_written_name( $column );
+		if ( false === $written ) {
+			// An alias-bearing column: SQLite already honors the casing.
+			continue;
+		}
+		if ( null === $written ) {
+			// Expression / wildcard we refused to reason about.
+			return null;
+		}
+		$rename_map[ strtolower( $written ) ] = $written;
+	}
+
+	return $rename_map;
+}
+
+/**
+ * Parses a statement and returns its SELECT column list when the query is a
+ * safe single-table SELECT we are willing to touch, or null otherwise.
+ *
+ * Shared by both integration paths so their safety judgement stays identical:
+ * the older `pre_query_sqlite_db` result rewriter and the rc.8 `query` SQL
+ * rewriter must agree on exactly which statements are in scope.
+ *
+ * @param string $statement The original MySQL statement.
+ * @return null|string[] The individual column expressions, or null.
+ */
+function sqlite_select_id_key_fix_parse_select( $statement ) {
 	$sql = trim( $statement );
 
 	// Must be a plain SELECT.
@@ -127,39 +180,100 @@ function sqlite_select_id_key_fix_build_rename_map( $statement ) {
 		return null;
 	}
 
-	$columns = sqlite_select_id_key_fix_split_columns( $columns_part );
-	if ( null === $columns ) {
+	return sqlite_select_id_key_fix_split_columns( $columns_part );
+}
+
+/**
+ * Classifies a single SELECT column expression.
+ *
+ * @param string $column One column expression from the SELECT list.
+ * @return string|false|null The written column name to preserve; false when the
+ *                           column already carries an explicit alias (nothing to
+ *                           do); null when the expression is unsafe to touch.
+ */
+function sqlite_select_id_key_fix_column_written_name( $column ) {
+	$column = trim( $column );
+	if ( '' === $column || '*' === $column ) {
+		// A wildcard makes the result shape unknown; bail out entirely.
 		return null;
 	}
 
-	$rename_map = array();
-	foreach ( $columns as $column ) {
-		$column = trim( $column );
-		if ( '' === $column || '*' === $column ) {
-			// A wildcard makes the result shape unknown; bail out entirely.
-			return null;
-		}
+	// Explicit alias: "expr AS alias" or "expr alias". SQLite honors the
+	// alias verbatim, so no renaming is needed for these.
+	if ( preg_match( '/\s+AS\s+[`"\']?[A-Za-z0-9_]+[`"\']?$/i', $column ) ) {
+		return false;
+	}
 
-		// Explicit alias: "expr AS alias" or "expr alias". SQLite honors the
-		// alias verbatim, so no renaming is needed for these.
-		if ( preg_match( '/\s+AS\s+[`"\']?[A-Za-z0-9_]+[`"\']?$/i', $column ) ) {
+	// A bare (optionally table-qualified) column reference, e.g. "P.id".
+	if ( preg_match( '/^[`"\']?([A-Za-z_][A-Za-z0-9_]*)[`"\']?\.[`"\']?([A-Za-z_][A-Za-z0-9_]*)[`"\']?$/', $column, $cm ) ) {
+		return $cm[2];
+	}
+	if ( preg_match( '/^[`"\']?([A-Za-z_][A-Za-z0-9_]*)[`"\']?$/', $column, $cm ) ) {
+		return $cm[1];
+	}
+
+	// Expression / function / implicit-alias form: do not guess.
+	return null;
+}
+
+/**
+ * rc.8 `query` filter: rewrites a safe single-table SELECT so each bare column
+ * reference gains an explicit quoted alias matching the written casing (e.g.
+ * `SELECT P.id FROM ...` -> `SELECT P.id AS "id" FROM ...`). SQLite echoes an
+ * aliased column back verbatim, so the result key keeps the written casing
+ * without needing a (non-existent in rc.8) result-set filter.
+ *
+ * The statement is returned unchanged whenever it is not a query we handle.
+ *
+ * @param string $query The SQL statement about to run.
+ * @return string The (possibly) rewritten statement.
+ */
+function sqlite_select_id_key_fix_rewrite_query( $query ) {
+	if ( ! is_string( $query ) ) {
+		return $query;
+	}
+
+	// Reuse the shared SELECT parser so both paths agree on scope. We only need
+	// the column-list slice to rewrite; the parser already vetted everything.
+	if ( ! preg_match( '/^(\s*SELECT\s+)(.*?)(\s+FROM\s+.*)$/is', $query, $m ) ) {
+		return $query;
+	}
+
+	$columns = sqlite_select_id_key_fix_parse_select( $query );
+	if ( null === $columns ) {
+		return $query;
+	}
+
+	$rewritten = array();
+	$changed   = false;
+
+	foreach ( $columns as $column ) {
+		$original = $column;
+		$trimmed  = trim( $column );
+		$written  = sqlite_select_id_key_fix_column_written_name( $trimmed );
+
+		if ( false === $written || null === $written ) {
+			// Already aliased (false) — parse_select guarantees no null here,
+			// but stay defensive and leave the column verbatim either way.
+			$rewritten[] = $original;
 			continue;
 		}
 
-		// A bare (optionally table-qualified) column reference, e.g. "P.id".
-		if ( preg_match( '/^[`"\']?([A-Za-z_][A-Za-z0-9_]*)[`"\']?\.[`"\']?([A-Za-z_][A-Za-z0-9_]*)[`"\']?$/', $column, $cm ) ) {
-			$written = $cm[2];
-		} elseif ( preg_match( '/^[`"\']?([A-Za-z_][A-Za-z0-9_]*)[`"\']?$/', $column, $cm ) ) {
-			$written = $cm[1];
-		} else {
-			// Expression / function / implicit-alias form: do not guess.
-			return null;
-		}
-
-		$rename_map[ strtolower( $written ) ] = $written;
+		// Always alias a bare column to the written name. SQLite otherwise
+		// returns the *declared* column name for an un-aliased reference (e.g.
+		// "ID" for wp_posts.ID even when the query wrote "id"); the explicit
+		// quoted alias forces the written casing into the result key. We cannot
+		// know the declared name here, so aliasing unconditionally is the only
+		// reliable fix.
+		$rewritten[] = $trimmed . ' AS "' . $written . '"';
+		$changed     = true;
 	}
 
-	return $rename_map;
+	if ( ! $changed ) {
+		return $query;
+	}
+
+	return $m[1] . implode( ', ', $rewritten ) . $m[3];
 }
 
 /**
