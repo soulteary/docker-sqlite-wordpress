@@ -85,3 +85,7 @@ Use the quick 1-minute initial installation, enjoy.
 ## Contributing
 
 Contributions are welcome! Please read the [Contributing Guide](./CONTRIBUTING.md) and the [Code of Conduct](./CODE_OF_CONDUCT.md) before getting started.
+
+## Security
+
+Found a security issue? Please review our [Security Policy](./SECURITY.md) and report it privately instead of opening a public issue.

@@ -1,0 +1,70 @@
+# Security Policy
+
+Thank you for helping keep **Docker SQLite WordPress** and its users safe. This document explains which versions receive security updates, how to report a vulnerability, and what to expect after you do.
+
+## Scope
+
+This project packages the official [WordPress image](https://hub.docker.com/_/wordpress) together with [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration), its optional native Rust accelerator `wp_mysql_parser`, and a small companion must-use plugin (`sqlite-select-id-key-fix.php`).
+
+This policy covers issues **introduced by this project**, including:
+
+- The `Dockerfile` and the way the image is assembled (build stages, permissions, bundled files).
+- The companion must-use plugin `sqlite-select-id-key-fix.php`.
+- The packaging and configuration of the native `wp_mysql_parser` extension.
+- The release workflows under `.github/workflows/`.
+
+The following are **out of scope** here and should be reported upstream:
+
+- Vulnerabilities in WordPress core → report via the [WordPress HackerOne program](https://hackerone.com/wordpress).
+- Vulnerabilities in `sqlite-database-integration` or the `wp_mysql_parser` extension → report to the [WordPress/sqlite-database-integration project](https://github.com/WordPress/sqlite-database-integration/security).
+- Vulnerabilities in third-party plugins or themes you install yourself.
+
+If you are unsure whether an issue belongs here or upstream, report it to us anyway and we will help route it.
+
+## Supported Versions
+
+Security fixes are applied to the latest released image tag only. Because image tags track the underlying WordPress and PHP versions, the most reliable way to stay secure is to run the newest tag.
+
+| Version         | Supported          |
+| --------------- | ------------------ |
+| Latest release  | :white_check_mark: |
+| Older releases  | :x:                |
+
+- `soulteary/sqlite-wordpress:latest` (Docker Hub) and `ghcr.io/soulteary/sqlite-wordpress:latest` (GHCR) always point to the most recent build.
+- Pinned version tags (e.g. `7.0.2`) are immutable snapshots and do **not** receive back-ported fixes. Upgrade to a newer tag to pick up security updates.
+
+## Reporting a Vulnerability
+
+**Please do not open a public GitHub Issue for security vulnerabilities.** Public disclosure before a fix is available puts users at risk.
+
+Instead, use one of the following private channels:
+
+1. **GitHub Security Advisories (preferred).** Open a private report via the repository's [Security → Report a vulnerability](https://github.com/soulteary/docker-sqlite-wordpress/security/advisories/new) page.
+2. **Email.** Send details to `soulteary@gmail.com` with a subject line starting with `[SECURITY]`.
+
+To help us triage quickly, please include as much of the following as you can:
+
+- The image tag and platform (architecture, OS) where you observed the issue.
+- A clear description of the vulnerability and its potential impact.
+- Step-by-step reproduction instructions or a proof of concept.
+- Relevant logs or output (e.g. `docker logs <container>`).
+- Any suggested remediation, if you have one.
+
+## What to Expect
+
+- **Acknowledgement:** we aim to acknowledge your report within **3 business days**.
+- **Assessment:** we will investigate, confirm the issue, and work out a fix or mitigation, keeping you informed of progress.
+- **Disclosure:** once a fix is released, we will publish an advisory and, with your consent, credit you for the discovery.
+- **Coordination:** if the root cause lies upstream (WordPress core or the SQLite integration), we will help coordinate reporting to the appropriate project.
+
+Please give us a reasonable amount of time to address the issue before any public disclosure. We are grateful for responsible disclosure and for your help protecting the community.
+
+## Security Best Practices for Users
+
+While not vulnerabilities in this image, the following practices reduce your exposure:
+
+- Always run the latest image tag and rebuild/pull regularly to receive updates.
+- Keep WordPress core, plugins, and themes updated from within the WordPress admin.
+- Protect the SQLite database file (mounted under `wp-content/database/`) with appropriate filesystem permissions and never expose it directly over the web.
+- Run the container behind a reverse proxy with TLS, and avoid exposing it directly to the public internet without hardening.
+- Use strong administrator credentials and limit access to the WordPress dashboard.
