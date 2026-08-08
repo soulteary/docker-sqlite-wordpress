@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: SQLite Diagnostics
- * Description: Read-only diagnostics page under the Tools menu that surfaces the native wp_mysql_parser extension state, SQLite version/source id, PHP/architecture environment details, and the sqlite-database-integration plugin version. Performs no writes and never touches the live site database.
+ * Description: Read-only diagnostics page under the Tools menu that surfaces the native wp_mysql_parser lexer/parser state, SQLite version/source id, live-connection PRAGMA values, main/WAL/SHM storage sizes, PHP/architecture environment details, and the sqlite-database-integration plugin version. Performs no writes and never modifies the live site database.
  * Version: 1.0.0
  * Author: soulteary
  *
@@ -47,6 +47,8 @@ function sqlite_diagnostics_render_page() {
 	$groups = array(
 		__( 'Native Extension', 'sqlite-diagnostics' )    => sqlite_diagnostics_native_extension(),
 		__( 'SQLite', 'sqlite-diagnostics' )              => sqlite_diagnostics_sqlite(),
+		__( 'PRAGMA (live connection)', 'sqlite-diagnostics' ) => sqlite_diagnostics_pragmas(),
+		__( 'Storage', 'sqlite-diagnostics' )             => sqlite_diagnostics_storage(),
 		__( 'Environment', 'sqlite-diagnostics' )         => sqlite_diagnostics_environment(),
 		__( 'Integration Plugin', 'sqlite-diagnostics' )  => sqlite_diagnostics_integration_plugin(),
 	);
@@ -75,6 +77,13 @@ function sqlite_diagnostics_render_page() {
 /**
  * Collects native wp_mysql_parser extension state and the resulting parse path.
  *
+ * Upstream (sqlite-database-integration v3.0.0-rc.8) decides the native lexer
+ * and parser independently via class_exists( ..., false ) rather than
+ * extension_loaded(). Either side can fall back to pure PHP on its own, so both
+ * are reported separately and the active parse path is only "fully accelerated"
+ * when both are native. The extension_loaded() and .ini rows are kept as
+ * build-time reference signals.
+ *
  * @return array<string,string> Label => value pairs (raw, unescaped).
  */
 function sqlite_diagnostics_native_extension() {
@@ -82,13 +91,24 @@ function sqlite_diagnostics_native_extension() {
 	$ini_path = '/usr/local/etc/php/conf.d/wp_mysql_parser.ini';
 	$ini_set  = file_exists( $ini_path );
 
-	$path = $loaded
-		? __( 'native accelerated path', 'sqlite-diagnostics' )
-		: __( 'PHP fallback path', 'sqlite-diagnostics' );
+	$native_lexer  = class_exists( 'WP_MySQL_Native_Lexer', false );
+	$native_parser = class_exists( 'WP_MySQL_Native_Parser', false );
+
+	if ( $native_lexer && $native_parser ) {
+		$path = __( 'native accelerated path (lexer + parser)', 'sqlite-diagnostics' );
+	} elseif ( $native_lexer ) {
+		$path = __( 'partial: native lexer, PHP parser fallback', 'sqlite-diagnostics' );
+	} elseif ( $native_parser ) {
+		$path = __( 'partial: PHP lexer fallback, native parser', 'sqlite-diagnostics' );
+	} else {
+		$path = __( 'PHP fallback path (lexer + parser)', 'sqlite-diagnostics' );
+	}
 
 	return array(
 		__( 'Extension loaded', 'sqlite-diagnostics' )        => sqlite_diagnostics_bool( $loaded ),
 		__( 'Build-time registration (.ini)', 'sqlite-diagnostics' ) => sqlite_diagnostics_bool( $ini_set ) . ' (' . $ini_path . ')',
+		__( 'Native lexer', 'sqlite-diagnostics' )            => sqlite_diagnostics_bool( $native_lexer ),
+		__( 'Native parser', 'sqlite-diagnostics' )           => sqlite_diagnostics_bool( $native_parser ),
 		__( 'Active parse path', 'sqlite-diagnostics' )       => $path,
 	);
 }
@@ -120,6 +140,135 @@ function sqlite_diagnostics_sqlite() {
 		__( 'SQLite version', 'sqlite-diagnostics' )   => $version,
 		__( 'SQLite source id', 'sqlite-diagnostics' ) => $source_id,
 	);
+}
+
+/**
+ * Resolves the live PDO connection used by the running site, without opening a
+ * new database. Prefers the PDO instance the driver injects into
+ * $GLOBALS['@pdo']; otherwise reaches it through the wpdb driver connection.
+ * Every level is guarded and any failure degrades to null (no fallback to an
+ * in-memory database, which would misrepresent the live PRAGMA state).
+ *
+ * @return PDO|null The live PDO connection, or null when unavailable.
+ */
+function sqlite_diagnostics_get_live_pdo() {
+	if ( isset( $GLOBALS['@pdo'] ) && $GLOBALS['@pdo'] instanceof PDO ) {
+		return $GLOBALS['@pdo'];
+	}
+
+	try {
+		if ( isset( $GLOBALS['wpdb'] ) && isset( $GLOBALS['wpdb']->dbh ) ) {
+			$dbh = $GLOBALS['wpdb']->dbh;
+			if ( is_object( $dbh ) && method_exists( $dbh, 'get_connection' ) ) {
+				$connection = $dbh->get_connection();
+				if ( is_object( $connection ) && method_exists( $connection, 'get_pdo' ) ) {
+					$pdo = $connection->get_pdo();
+					if ( $pdo instanceof PDO ) {
+						return $pdo;
+					}
+				}
+			}
+		}
+	} catch ( Exception $e ) {
+		return null;
+	}
+
+	return null;
+}
+
+/**
+ * Reads key PRAGMA values from the live SQLite connection. Purely read-only:
+ * every PRAGMA is a SELECT-style read wrapped in its own try/catch so a single
+ * failure does not suppress the rest. When no live connection is available the
+ * whole group reports "live connection unavailable" rather than probing an
+ * in-memory database.
+ *
+ * @return array<string,string> Label => value pairs (raw, unescaped).
+ */
+function sqlite_diagnostics_pragmas() {
+	$pdo = sqlite_diagnostics_get_live_pdo();
+
+	$pragmas = array(
+		'journal_mode'      => __( 'Journal mode', 'sqlite-diagnostics' ),
+		'synchronous'       => __( 'Synchronous', 'sqlite-diagnostics' ),
+		'page_size'         => __( 'Page size', 'sqlite-diagnostics' ),
+		'page_count'        => __( 'Page count', 'sqlite-diagnostics' ),
+		'freelist_count'    => __( 'Freelist count', 'sqlite-diagnostics' ),
+		'foreign_keys'      => __( 'Foreign keys', 'sqlite-diagnostics' ),
+		'busy_timeout'      => __( 'Busy timeout', 'sqlite-diagnostics' ),
+		'cache_size'        => __( 'Cache size', 'sqlite-diagnostics' ),
+		'wal_autocheckpoint' => __( 'WAL autocheckpoint', 'sqlite-diagnostics' ),
+		'encoding'          => __( 'Encoding', 'sqlite-diagnostics' ),
+	);
+
+	if ( ! $pdo instanceof PDO ) {
+		$rows = array();
+		foreach ( $pragmas as $label ) {
+			$rows[ $label ] = __( 'live connection unavailable', 'sqlite-diagnostics' );
+		}
+		return $rows;
+	}
+
+	$rows = array();
+	foreach ( $pragmas as $pragma => $label ) {
+		try {
+			$statement = $pdo->query( 'PRAGMA ' . $pragma );
+			$value     = false === $statement ? false : $statement->fetchColumn();
+
+			if ( false === $value || null === $value ) {
+				$rows[ $label ] = __( 'unavailable', 'sqlite-diagnostics' );
+			} else {
+				$rows[ $label ] = (string) $value;
+			}
+		} catch ( Exception $e ) {
+			$rows[ $label ] = __( 'error', 'sqlite-diagnostics' );
+		}
+	}
+
+	return $rows;
+}
+
+/**
+ * Reports the on-disk footprint of the SQLite database: the main file plus its
+ * WAL and SHM sidecars, and their combined total. Sidecar files only exist
+ * while a WAL-mode journal is active, so their absence is normal and reported
+ * as "not present". Read-only stat calls; the database itself is never opened.
+ *
+ * @return array<string,string> Label => value pairs (raw, unescaped).
+ */
+function sqlite_diagnostics_storage() {
+	if ( ! defined( 'FQDB' ) ) {
+		return array(
+			__( 'Main file', 'sqlite-diagnostics' ) => __( 'FQDB not defined', 'sqlite-diagnostics' ),
+		);
+	}
+
+	$fqdb  = (string) FQDB;
+	$files = array(
+		__( 'Main file', 'sqlite-diagnostics' ) => $fqdb,
+		__( 'WAL sidecar', 'sqlite-diagnostics' ) => $fqdb . '-wal',
+		__( 'SHM sidecar', 'sqlite-diagnostics' ) => $fqdb . '-shm',
+	);
+
+	$rows  = array();
+	$total = 0;
+	foreach ( $files as $label => $path ) {
+		if ( file_exists( $path ) ) {
+			$size = filesize( $path );
+			if ( false === $size ) {
+				$rows[ $label ] = $path . ' (' . __( 'size unknown', 'sqlite-diagnostics' ) . ')';
+			} else {
+				$total         += (int) $size;
+				$rows[ $label ] = $path . ' (' . sqlite_diagnostics_format_bytes( $size ) . ')';
+			}
+		} else {
+			$rows[ $label ] = $path . ' (' . __( 'not present', 'sqlite-diagnostics' ) . ')';
+		}
+	}
+
+	$rows[ __( 'Total', 'sqlite-diagnostics' ) ] = sqlite_diagnostics_format_bytes( $total );
+
+	return $rows;
 }
 
 /**
