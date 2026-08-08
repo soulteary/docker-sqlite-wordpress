@@ -66,6 +66,11 @@ COPY --from=ext-builder /plugin ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/s
 # in the mu-plugins root are auto-loaded and cannot be deactivated.
 COPY sqlite-select-id-key-fix.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-select-id-key-fix.php
 
+# Companion must-use plugin: read-only diagnostics page under the Tools menu
+# that surfaces the native parser / SQLite / environment / integration state.
+# Auto-loaded from the mu-plugins root and cannot be deactivated.
+COPY sqlite-diagnostics.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-diagnostics.php
+
 # mu-plugins only auto-loads .php files in the mu-plugins root; it does NOT
 # recurse into subdirectories, so the plugin's own
 # sqlite-database-integration/load.php is never executed on its own. This

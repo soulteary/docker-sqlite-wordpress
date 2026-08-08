@@ -19,6 +19,18 @@ Verify it is loaded inside the container:
 docker exec -it <container> php -m | grep wp_mysql_parser
 ```
 
+## SQLite Diagnostics Page
+
+The image bundles a read-only diagnostics must-use plugin, `sqlite-diagnostics.php`, dropped into `wp-content/mu-plugins/`. It adds a **Tools → SQLite Diagnostics** page (visible to administrators with the `manage_options` capability) that gathers the SQLite runtime state into one place: whether the native `wp_mysql_parser` extension is loaded and which parse path is active, the SQLite version and source id, PHP/architecture and `pdo_sqlite` details, the SQLite drop-in version and database file path/size, and the bundled `sqlite-database-integration` plugin version. The page performs no writes and probes the SQLite version through an in-memory database, so the live site database is never touched.
+
+Cross-check the same values from the CLI inside the container:
+
+```bash
+docker exec -it <container> php -m | grep wp_mysql_parser
+docker exec -it <container> php -r 'echo (new PDO("sqlite::memory:"))->query("SELECT sqlite_version()")->fetchColumn(), PHP_EOL;'
+docker exec -it <container> php -r 'echo (new PDO("sqlite::memory:"))->query("SELECT sqlite_source_id()")->fetchColumn(), PHP_EOL;'
+```
+
 ## SELECT id Key Case Fix
 
 The image also bundles a small companion must-use plugin, `sqlite-select-id-key-fix.php`, dropped into `wp-content/mu-plugins/`. WordPress auto-loads files in the mu-plugins root, so it is always active and cannot be accidentally disabled.
