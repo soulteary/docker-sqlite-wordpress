@@ -1,7 +1,7 @@
 # plugin: https://github.com/WordPress/sqlite-database-integration
 # The optional native Rust extension `wp_mysql_parser` accelerates the MySQL
 # lexer/parser used by the SQLite driver. It requires the 3.0 monorepo layout.
-ARG SQLITE_DATABASE_INTEGRATION_VERSION=3.0.0-rc.7
+ARG SQLITE_DATABASE_INTEGRATION_VERSION=3.0.0-rc.8
 
 # ---------- Stage 1: build the native Rust extension + resolve plugin symlink ----------
 FROM wordpress:7.0.2-php8.5-apache AS ext-builder
