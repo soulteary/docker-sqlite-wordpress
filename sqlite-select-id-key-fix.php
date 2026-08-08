@@ -17,6 +17,9 @@
  * It is intentionally conservative: anything it does not fully understand is
  * left untouched, so the SQLite integration plugin handles it as usual.
  *
+ * A diagnostics screen is registered under Tools -> "SQLite id key fix" that
+ * runs a live probe and reports whether the fix is currently effective.
+ *
  * @package sqlite-select-id-key-fix
  */
 
@@ -44,6 +47,123 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 add_filter( 'pre_query_sqlite_db', 'sqlite_select_id_key_fix', 10, 5 );
 add_filter( 'query', 'sqlite_select_id_key_fix_rewrite_query', 10, 1 );
+
+/*
+ * Admin diagnostics page. Registers a "SQLite id fix" screen under Tools that
+ * runs the same probe used from the CLI (a bare "SELECT P.id" fetched as both
+ * ARRAY_A and OBJECT) and reports whether the fix is currently effective.
+ */
+add_action( 'admin_menu', 'sqlite_select_id_key_fix_register_admin_page' );
+
+/**
+ * Registers the diagnostics page under the Tools menu.
+ *
+ * @return void
+ */
+function sqlite_select_id_key_fix_register_admin_page() {
+	add_management_page(
+		__( 'SQLite id key fix', 'sqlite-select-id-key-fix' ),
+		__( 'SQLite id key fix', 'sqlite-select-id-key-fix' ),
+		'manage_options',
+		'sqlite-select-id-key-fix',
+		'sqlite_select_id_key_fix_render_admin_page'
+	);
+}
+
+/**
+ * Runs the diagnostic probe against the live database.
+ *
+ * Mirrors the CLI check: a single-table, un-aliased "SELECT P.id" fetched as
+ * both ARRAY_A and OBJECT. When the plugin is effective the written casing
+ * "id" survives; without it SQLite would echo back the declared column "ID".
+ *
+ * @return array{
+ *     filtered_sql:string,
+ *     has_alias:bool,
+ *     array_ok:bool,
+ *     object_ok:bool,
+ *     effective:bool,
+ *     table:string
+ * }
+ */
+function sqlite_select_id_key_fix_run_probe() {
+	global $wpdb;
+
+	$sql          = 'SELECT P.id FROM ' . $wpdb->posts . ' AS P ORDER BY P.ID LIMIT 1';
+	$filtered_sql = (string) apply_filters( 'query', $sql );
+
+	$array_row  = $wpdb->get_row( $sql, ARRAY_A );
+	$object_row = $wpdb->get_row( $sql, OBJECT );
+
+	$array_ok  = is_array( $array_row ) && array_key_exists( 'id', $array_row );
+	$object_ok = is_object( $object_row ) && property_exists( $object_row, 'id' );
+
+	// The rc.8 path proves itself through the rewritten SQL alias; the older
+	// result-set path proves itself through the ARRAY_A / OBJECT keys.
+	$has_alias = (bool) preg_match( '/P\.id\s+AS\s+"id"/i', $filtered_sql );
+
+	return array(
+		'filtered_sql' => $filtered_sql,
+		'has_alias'    => $has_alias,
+		'array_ok'     => $array_ok,
+		'object_ok'    => $object_ok,
+		'effective'    => ( $has_alias || ( $array_ok && $object_ok ) ),
+		'table'        => $wpdb->posts,
+	);
+}
+
+/**
+ * Renders the diagnostics admin page.
+ *
+ * @return void
+ */
+function sqlite_select_id_key_fix_render_admin_page() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( esc_html__( 'You do not have permission to view this page.', 'sqlite-select-id-key-fix' ) );
+	}
+
+	$probe = sqlite_select_id_key_fix_run_probe();
+
+	$yes = '<span style="color:#008a00;font-weight:600;">' . esc_html__( 'yes', 'sqlite-select-id-key-fix' ) . '</span>';
+	$no  = '<span style="color:#d63638;font-weight:600;">' . esc_html__( 'no', 'sqlite-select-id-key-fix' ) . '</span>';
+
+	echo '<div class="wrap">';
+	echo '<h1>' . esc_html__( 'SQLite id key fix', 'sqlite-select-id-key-fix' ) . '</h1>';
+
+	if ( $probe['effective'] ) {
+		echo '<div class="notice notice-success"><p><strong>'
+			. esc_html__( 'The fix is effective.', 'sqlite-select-id-key-fix' )
+			. '</strong> '
+			. esc_html__( 'The written column casing "id" is preserved.', 'sqlite-select-id-key-fix' )
+			. '</p></div>';
+	} else {
+		echo '<div class="notice notice-error"><p><strong>'
+			. esc_html__( 'The fix is NOT effective.', 'sqlite-select-id-key-fix' )
+			. '</strong> '
+			. esc_html__( 'The written column casing "id" was not preserved.', 'sqlite-select-id-key-fix' )
+			. '</p></div>';
+	}
+
+	echo '<p>' . esc_html__( 'This page runs the same probe used from the command line: an un-aliased single-table "SELECT P.id" fetched as ARRAY_A and OBJECT.', 'sqlite-select-id-key-fix' ) . '</p>';
+
+	echo '<h2>' . esc_html__( 'Probe', 'sqlite-select-id-key-fix' ) . '</h2>';
+	echo '<p><strong>' . esc_html__( 'Original SQL', 'sqlite-select-id-key-fix' ) . ':</strong></p>';
+	echo '<pre style="background:#f6f7f7;padding:10px;overflow:auto;">'
+		. esc_html( 'SELECT P.id FROM ' . $probe['table'] . ' AS P ORDER BY P.ID LIMIT 1' )
+		. '</pre>';
+	echo '<p><strong>' . esc_html__( 'Filtered SQL', 'sqlite-select-id-key-fix' ) . ':</strong></p>';
+	echo '<pre style="background:#f6f7f7;padding:10px;overflow:auto;">' . esc_html( $probe['filtered_sql'] ) . '</pre>';
+
+	echo '<table class="widefat striped" style="max-width:640px;">';
+	echo '<thead><tr><th>' . esc_html__( 'Check', 'sqlite-select-id-key-fix' ) . '</th><th>' . esc_html__( 'Result', 'sqlite-select-id-key-fix' ) . '</th></tr></thead>';
+	echo '<tbody>';
+	echo '<tr><td>' . esc_html__( 'Filtered SQL contains P.id AS "id"', 'sqlite-select-id-key-fix' ) . '</td><td>' . ( $probe['has_alias'] ? $yes : $no ) . '</td></tr>';
+	echo '<tr><td>' . esc_html__( 'ARRAY_A row has key "id"', 'sqlite-select-id-key-fix' ) . '</td><td>' . ( $probe['array_ok'] ? $yes : $no ) . '</td></tr>';
+	echo '<tr><td>' . esc_html__( 'OBJECT row has property "id"', 'sqlite-select-id-key-fix' ) . '</td><td>' . ( $probe['object_ok'] ? $yes : $no ) . '</td></tr>';
+	echo '</tbody></table>';
+
+	echo '</div>';
+}
 
 /**
  * Intercepts safe single-table SELECT queries and restores the column-name
