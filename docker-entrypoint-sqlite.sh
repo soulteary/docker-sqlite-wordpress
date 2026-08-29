@@ -17,6 +17,18 @@ set -Eeuo pipefail
 : "${WORDPRESS_DOCROOT:=/var/www/html}"
 DOCROOT="${WORDPRESS_DOCROOT}"
 
+# Resolve a Docker secret while the entrypoint still has permission to read a
+# root-owned file. The value is exported only to the container process tree; it
+# is not added to the image or Docker's configured environment metadata.
+if [ -z "${WORDPRESS_SITE_URL_UPDATE_TOKEN:-}" ] \
+	&& [ -n "${WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE:-}" ] \
+	&& [ -f "${WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE}" ] \
+	&& [ -r "${WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE}" ]; then
+	resolved_site_url_update_token="$(< "${WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE}")"
+	export SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED="${resolved_site_url_update_token}"
+	unset resolved_site_url_update_token
+fi
+
 # Run the stock entrypoint's setup so it performs its volume seeding /
 # wp-config generation but does NOT start Apache/php-fpm. The stock script only
 # runs that setup when invoked as apache2*/php-fpm or under the name
@@ -29,6 +41,18 @@ dst_content="${DOCROOT}/wp-content"
 
 if [ -d "$src_content" ] && [ -d "$DOCROOT" ]; then
 	mkdir -p "$dst_content"
+
+	# Keep the disabled-by-default recovery endpoint available on existing
+	# volumes too. Never follow a persisted symlink while copying as root.
+	managed_root_file="tool-update-site-url.php"
+	if [ -f "${WORDPRESS_PREPARE_DIR}/${managed_root_file}" ]; then
+		if [ -L "${DOCROOT}/${managed_root_file}" ] || ! cmp -s "${WORDPRESS_PREPARE_DIR}/${managed_root_file}" "${DOCROOT}/${managed_root_file}"; then
+			rm -f "${DOCROOT}/${managed_root_file}"
+			cp -f "${WORDPRESS_PREPARE_DIR}/${managed_root_file}" "${DOCROOT}/${managed_root_file}"
+		fi
+	else
+		rm -f "${DOCROOT}/${managed_root_file}"
+	fi
 
 	# The SQLite drop-in itself. Without this file WordPress uses MySQL.
 	if [ -f "$src_content/db.php" ]; then
@@ -108,8 +132,12 @@ if [ -d "$src_content" ] && [ -d "$DOCROOT" ]; then
 		group="${APACHE_RUN_GROUP:-www-data}"
 		user="${user#\#}"
 		group="${group#\#}"
+		# Keep the security-sensitive recovery endpoint root-owned and read-only
+		# to the web process. WordPress-owned content remains writable as before.
+		chown root:root "${DOCROOT}/${managed_root_file}" 2>/dev/null || true
 		chown -R "$user:$group" "$dst_content/db.php" "$dst_content/mu-plugins" "$dst_content/database" 2>/dev/null || true
 	fi
+	chmod 644 "${DOCROOT}/${managed_root_file}" 2>/dev/null || true
 	chmod 755 "$dst_content/database" 2>/dev/null || true
 	chmod 640 "$dst_content/database/.ht.sqlite" 2>/dev/null || true
 fi

@@ -10,6 +10,8 @@ This policy covers issues **introduced by this project**, including:
 
 - The `Dockerfile` and the way the image is assembled (build stages, permissions, bundled files).
 - The companion must-use plugin `sqlite-select-id-key-fix.php`.
+- The disabled-by-default, token-protected `/tool-update-site-url.php`
+  recovery endpoint.
 - The packaging and configuration of the native `wp_mysql_parser` extension.
 - The release workflows under `.github/workflows/`.
 
@@ -68,3 +70,8 @@ While not vulnerabilities in this image, the following practices reduce your exp
 - Protect the SQLite database file (mounted under `wp-content/database/`) with appropriate filesystem permissions and never expose it directly over the web.
 - Run the container behind a reverse proxy with TLS, and avoid exposing it directly to the public internet without hardening.
 - Use strong administrator credentials and limit access to the WordPress dashboard.
+- Leave the site URL recovery endpoint disabled except during a recovery. Use
+  the exact `WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true` switch together with
+  `WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE` and a randomly generated token. Send
+  the token only over TLS on untrusted networks, then remove both environment
+  settings immediately after the repair.

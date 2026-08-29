@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Added a disabled-by-default `/tool-update-site-url.php` recovery page that
+  requires both an explicit environment enable switch and a strong token, then
+  atomically updates the WordPress `siteurl` and `home` options after a domain,
+  scheme, port, or path change.
+
 ## [7.1.0] - 2026-08-29
 
 ### Changed
