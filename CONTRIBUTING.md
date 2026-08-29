@@ -70,10 +70,14 @@ docker run --rm -it -p 127.0.0.1:8080:80 -v "$(pwd)/wordpress:/var/www/html" sou
 
 This project supports `linux/amd64`, `linux/arm64`, `linux/arm/v7`, `linux/arm/v6`, and `linux/arm/v5`. The native Rust extension is compiled only on `amd64` and `arm64`; the other 32-bit ARM platforms automatically skip it and fall back to the pure-PHP parser (see the comments in the `Dockerfile`).
 
-Build and load one host-compatible platform for local execution:
+Build and load one platform that matches your Docker host. Set
+`TARGET_PLATFORM` to `linux/amd64` or `linux/arm64` as appropriate; selecting a
+different architecture requires emulation and does not exercise the native
+extension for your host architecture:
 
 ```bash
-docker buildx build --load --platform linux/amd64 -t soulteary/sqlite-wordpress:dev .
+TARGET_PLATFORM=linux/amd64
+docker buildx build --load --platform "${TARGET_PLATFORM}" -t soulteary/sqlite-wordpress:dev .
 ```
 
 For a multi-platform result, explicitly select an OCI archive output. Buildx
