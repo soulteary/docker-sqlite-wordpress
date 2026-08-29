@@ -26,12 +26,14 @@ git tag -a 7.1.0 -m "Release 7.1.0"
 git push origin refs/tags/7.1.0
 ```
 
-The `Release` workflow validates that the tag is a stable semantic version, matches both WordPress base-image stages and the documentation, and does not already exist in either container registry. It then runs one five-platform matrix and publishes:
+The `Release` workflow validates that the tag is a stable semantic version, matches both WordPress base-image stages and the documentation, and does not already exist in either container registry. It then runs one five-platform matrix and publishes the immutable version tags:
 
-- `soulteary/sqlite-wordpress:7.1.0` and `soulteary/sqlite-wordpress:latest`
-- `ghcr.io/soulteary/sqlite-wordpress:7.1.0` and `ghcr.io/soulteary/sqlite-wordpress:latest`
+- `soulteary/sqlite-wordpress:7.1.0`
+- `ghcr.io/soulteary/sqlite-wordpress:7.1.0`
 
-The manual workflow entry is only for an unpublished tag selected as the workflow ref. Running it from a branch fails during preflight.
+After a successful release, the serialized `Promote latest` workflow selects the highest stable repository tag, verifies that both registries contain the same complete five-platform manifest, and promotes that version to `latest`. Selecting the highest published version makes out-of-order workflow completion safe and prevents an older release from moving `latest` backwards.
+
+The manual `Release` entry is only for an unpublished tag selected as the workflow ref. Running it from a branch fails during preflight. Manually dispatch `Promote latest` from `main` to reconcile the mutable tags without rebuilding an image.
 
 ## Verify and announce
 
