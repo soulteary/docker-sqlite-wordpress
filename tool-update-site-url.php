@@ -589,9 +589,8 @@ function sqlite_wordpress_site_url_tool_validate_url( $value, $label ) {
 		throw new InvalidArgumentException( $label . ' must be a URL.' );
 	}
 
-	$value = trim( $value );
 	if ( '' === $value || strlen( $value ) > 2048 ) {
-		throw new InvalidArgumentException( $label . ' must contain a URL no longer than 2048 characters.' );
+		throw new InvalidArgumentException( $label . ' must contain a URL no longer than 2048 bytes.' );
 	}
 	if ( preg_match( '/[\x00-\x20\x7F\\\\]/', $value ) ) {
 		throw new InvalidArgumentException( $label . ' must not contain whitespace, control characters, or backslashes.' );

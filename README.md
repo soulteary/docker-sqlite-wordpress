@@ -244,11 +244,12 @@ documented disabled start.
 | Rule | Accepted examples / behavior |
 | --- | --- |
 | Absolute HTTP(S) URL | `https://example.com`, `http://localhost:8080` |
-| Optional port or subdirectory | `https://example.com:8443/wordpress` |
+| Maximum length | 2048 bytes per submitted address. |
+| Optional port or subdirectory | `https://example.com:8443/wordpress`; explicit ports must be between 1 and 65535. |
 | Local and private hosts | Localhost, private IPv4, and bracketed IPv6 addresses are accepted. |
 | Internationalized hostnames | Use their ASCII/Punycode form. |
 | Trailing slash | Removed before the option is stored. |
-| Rejected components | Embedded username/password, query string, fragment, whitespace, backslash, or `.` / `..` path segments. |
+| Rejected components | Embedded username/password, query string, fragment, leading, trailing, or internal whitespace, control characters, backslash, or `.` / `..` path segments. |
 
 Both fields are required even when their values are identical. Use different
 values only when WordPress core is installed in a subdirectory, for example
