@@ -77,7 +77,7 @@ You can also use docker compose to start wordpress:
 services:
 
   wordpress:
-    image: soulteary/sqlite-wordpress:7.1.0
+    image: soulteary/sqlite-wordpress:latest
     # or use: ghcr.io/soulteary/sqlite-wordpress:7.1.0
     restart: always
     ports:
@@ -91,6 +91,62 @@ Save the file as `docker-compose.yml` and then execute `docker compose up`, then
 ![](.github/ready-to-use.jpg)
 
 Use the quick 1-minute initial installation, enjoy.
+
+## Emergency Site URL Recovery Tool
+
+The image includes `/tool-update-site-url.php` for recovering a site after an
+incorrect domain, scheme, port, or subdirectory was saved in WordPress. The
+standalone page remains reachable even when the normal site or `wp-admin`
+redirects to the old address. It updates both settings in one SQLite
+transaction:
+
+- **WordPress Address (URL)** → the `siteurl` option (where WordPress core files
+  are located).
+- **Site Address (URL)** → the `home` option (the public visitor-facing URL).
+
+The endpoint is disabled by default and returns `404 Not Found` until a strong
+recovery token is configured. A Docker secret is preferred so the token does
+not appear in `docker inspect` output:
+
+```bash
+mkdir -p secrets
+openssl rand -hex 32 > secrets/site-url-update-token
+chmod 600 secrets/site-url-update-token
+```
+
+```yaml
+services:
+
+  wordpress:
+    image: soulteary/sqlite-wordpress:7.1.0
+    ports:
+      - 8080:80
+    environment:
+      WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE: /run/secrets/site-url-update-token
+    secrets:
+      - site-url-update-token
+    volumes:
+      - ./wordpress:/var/www/html
+
+secrets:
+  site-url-update-token:
+    file: ./secrets/site-url-update-token
+```
+
+Recreate the container, then open
+`http://localhost:8080/tool-update-site-url.php`. Enter the generated token and
+the two desired addresses. The token is accepted only in the POST body; never
+append it to the URL. When the site works at its new address, remove the token
+configuration and recreate the container so the endpoint returns 404 again.
+
+For a short-lived local recovery, the token can instead be passed directly as
+`WORDPRESS_SITE_URL_UPDATE_TOKEN`. Generate it with `openssl rand -hex 32` and
+use TLS whenever the endpoint is reachable across an untrusted network.
+
+The tool intentionally refuses WordPress Multisite installations. It also
+refuses to write when `WP_HOME` or `WP_SITEURL` is defined in `wp-config.php`,
+because those constants override the database values; update or remove the
+constants instead.
 
 ### Volume / upgrade note
 

@@ -109,6 +109,11 @@ COPY sqlite-diagnostics.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlit
 # via wp-content/db.php and does not depend on this loader.
 COPY sqlite-database-integration-loader.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration-loader.php
 
+# Disabled-by-default emergency endpoint for repairing the database-backed
+# WordPress Address (`siteurl`) and Site Address (`home`) after a domain change.
+# It returns 404 unless a strong recovery token is supplied at runtime.
+COPY tool-update-site-url.php ${WORDPRESS_PREPARE_DIR}/tool-update-site-url.php
+
 # Self-healing entrypoint: the stock WordPress entrypoint only seeds a mounted
 # volume when it is empty, so an already-initialized/old volume never receives
 # the SQLite drop-in (wp-content/db.php) and WordPress falls back to MySQL
@@ -141,6 +146,7 @@ RUN mv "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integrati
 RUN test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration/wp-includes/sqlite/db.php" && \
     test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration/wp-includes/database/load.php" && \
     test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration/integrations/query-monitor/boot.php" && \
+    test -f "${WORDPRESS_PREPARE_DIR}/tool-update-site-url.php" && \
     grep -q 'SQLITE_DB_DROPIN_VERSION' "${WORDPRESS_PREPARE_DIR}/wp-content/db.php" && \
     ! grep -q '{SQLITE_IMPLEMENTATION_FOLDER_PATH}' "${WORDPRESS_PREPARE_DIR}/wp-content/db.php"
 

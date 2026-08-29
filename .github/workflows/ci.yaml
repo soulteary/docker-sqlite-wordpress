@@ -61,7 +61,8 @@ jobs:
               scripts/validate-release.sh \
               sqlite-database-integration-loader.php \
               sqlite-diagnostics.php \
-              sqlite-select-id-key-fix.php; then
+              sqlite-select-id-key-fix.php \
+              tool-update-site-url.php; then
             image_changed=false
           fi
           echo "image_changed=${image_changed}" >> "${GITHUB_OUTPUT}"
@@ -142,5 +143,7 @@ jobs:
             test -f /usr/src/wordpress/wp-content/mu-plugins/sqlite-database-integration-loader.php
             test -f /usr/src/wordpress/wp-content/mu-plugins/sqlite-diagnostics.php
             test -f /usr/src/wordpress/wp-content/mu-plugins/sqlite-select-id-key-fix.php
+            test -f /usr/src/wordpress/tool-update-site-url.php
             php -l /usr/src/wordpress/wp-content/db.php
+            php -l /usr/src/wordpress/tool-update-site-url.php
           '
