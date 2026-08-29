@@ -8,18 +8,24 @@ if [[ ! "${release_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 	exit 1
 fi
 
-mapfile -t base_images < <(sed -nE 's/^FROM (wordpress:[^[:space:]]+).*$/\1/p' Dockerfile)
+wordpress_image="$(sed -nE 's/^ARG WORDPRESS_IMAGE=([^[:space:]]+)$/\1/p' Dockerfile)"
+if [[ -z "${wordpress_image}" ]]; then
+	echo "WORDPRESS_IMAGE must be defined" >&2
+	exit 1
+fi
+
+mapfile -t base_images < <(sed -nE 's/^FROM \$\{WORDPRESS_IMAGE\}.*$/WORDPRESS_IMAGE/p' Dockerfile)
 if [[ "${#base_images[@]}" -ne 2 ]]; then
-	echo "expected exactly two official WordPress base-image references" >&2
+	echo "expected exactly two stages based on WORDPRESS_IMAGE" >&2
 	exit 1
 fi
 
-if [[ "${base_images[0]}" != "${base_images[1]}" ]]; then
-	echo "builder and runtime stages must use the same WordPress image" >&2
+if [[ ! "${wordpress_image}" =~ ^wordpress:[^@[:space:]]+@sha256:[0-9a-f]{64}$ ]]; then
+	echo "WORDPRESS_IMAGE must pin an official image tag and sha256 digest" >&2
 	exit 1
 fi
 
-base_image="${base_images[0]}"
+base_image="${wordpress_image%@sha256:*}"
 if [[ ! "${base_image}" =~ ^wordpress:${release_version}-php[0-9]+\.[0-9]+-apache$ ]]; then
 	echo "base image ${base_image} does not match release ${release_version}" >&2
 	exit 1
@@ -30,6 +36,18 @@ php_version="${php_version%-apache}"
 plugin_version="$(sed -nE 's/^ARG SQLITE_DATABASE_INTEGRATION_VERSION=([^[:space:]]+)$/\1/p' Dockerfile)"
 if [[ ! "${plugin_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 	echo "SQLite Database Integration must use a stable semantic version" >&2
+	exit 1
+fi
+
+plugin_commit="$(sed -nE 's/^ARG SQLITE_DATABASE_INTEGRATION_COMMIT=([^[:space:]]+)$/\1/p' Dockerfile)"
+if [[ ! "${plugin_commit}" =~ ^[0-9a-f]{40}$ ]]; then
+	echo "SQLite Database Integration must pin a full commit SHA" >&2
+	exit 1
+fi
+
+rust_toolchain="$(sed -nE 's/^ARG RUST_TOOLCHAIN_VERSION=([^[:space:]]+)$/\1/p' Dockerfile)"
+if [[ ! "${rust_toolchain}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+	echo "Rust toolchain must use an exact stable version" >&2
 	exit 1
 fi
 
@@ -45,10 +63,14 @@ grep -Fq "image: soulteary/sqlite-wordpress:${release_version}" docker-compose.y
 	echo "docker-compose.yml does not use the ${release_version} image tag" >&2
 	exit 1
 }
+grep -Fq "org.opencontainers.image.version=\"${release_version}\"" Dockerfile || {
+	echo "OCI image version does not match ${release_version}" >&2
+	exit 1
+}
 grep -Fq "## [${release_version}]" CHANGELOG.md || {
 	echo "CHANGELOG.md does not contain a ${release_version} release section" >&2
 	exit 1
 }
 
-printf 'release_version=%s\nbase_image=%s\nplugin_version=%s\n' \
-	"${release_version}" "${base_image}" "${plugin_version}"
+printf 'release_version=%s\nwordpress_image=%s\nplugin_version=%s\nplugin_commit=%s\nrust_toolchain=%s\n' \
+	"${release_version}" "${wordpress_image}" "${plugin_version}" "${plugin_commit}" "${rust_toolchain}"
