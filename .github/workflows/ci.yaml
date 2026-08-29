@@ -147,3 +147,21 @@ jobs:
             php -l /usr/src/wordpress/wp-content/db.php
             php -l /usr/src/wordpress/tool-update-site-url.php
           '
+          # PHP variables below are intentionally protected from shell expansion.
+          # shellcheck disable=SC2016
+          docker run --rm sqlite-wordpress:test php -r '
+            require "/var/www/html/wp-load.php";
+            $driver = $GLOBALS["wpdb"]->get_driver();
+            foreach (["beginTransaction", "commit", "rollBack", "inTransaction"] as $method) {
+              if (!method_exists($driver, $method)) {
+                fwrite(STDERR, "SQLite driver transaction method unavailable: {$method}\n");
+                exit(1);
+              }
+            }
+            $driver->beginTransaction();
+            if (!$driver->inTransaction()) {
+              fwrite(STDERR, "SQLite driver did not enter a transaction.\n");
+              exit(1);
+            }
+            $driver->rollBack();
+          '
