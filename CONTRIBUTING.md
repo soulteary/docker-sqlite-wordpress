@@ -108,12 +108,12 @@ Please search for existing issues before opening a new one. When reporting a bug
 
 - **Dockerfile**: Keep the multi-stage build structure clear; keep necessary comments for non-obvious trade-offs (such as skipping the Rust build per platform).
 - **PHP** (`sqlite-select-id-key-fix.php`, etc.): Follow the WordPress coding standards and keep behavior conservative and safe to fall back on, avoiding destructive changes for cases that cannot be fully reasoned about.
-- **YAML workflows**: When modifying `.github/workflows/`, keep both release pipelines (latest / version) consistent.
+- **YAML workflows**: Keep pull-request validation and the tag-driven `Release` workflow consistent with the supported platform matrix and release policy.
 - Comments should explain intent and constraints, not restate what the code already expresses.
 
 ## Versioning and Releases
 
-Releases are triggered by maintainers pushing a Git tag in the form `x.y.z`, which runs the `Release Version` and `Release Latest` workflows under `.github/workflows/`. These push multi-arch images to both [Docker Hub](https://hub.docker.com/r/soulteary/sqlite-wordpress) and [GHCR](https://github.com/soulteary/docker-sqlite-wordpress/pkgs/container/sqlite-wordpress). Regular contributors do not need to run the release process manually.
+Releases are triggered by maintainers pushing a Git tag in the form `x.y.z`, which runs the single `Release` workflow under `.github/workflows/`. It publishes the same multi-arch image under both the immutable version tag and mutable `latest` tag to [Docker Hub](https://hub.docker.com/r/soulteary/sqlite-wordpress) and [GHCR](https://github.com/soulteary/docker-sqlite-wordpress/pkgs/container/sqlite-wordpress). Regular contributors do not need to run the release process manually; maintainers should follow [RELEASING.md](./RELEASING.md).
 
 ---
 

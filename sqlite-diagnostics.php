@@ -11,8 +11,9 @@
  * sqlite-database-integration plugin. This drop-in gathers their runtime state
  * into a single, admin-only page so operators can confirm the accelerated path
  * is active without shelling into the container. Every probe is read-only and
- * the SQLite version check uses an in-memory database, so the real site data is
- * never read or modified.
+ * the SQLite version check uses an in-memory database. Live PRAGMA values are
+ * read from the existing site connection, but the real site data is never
+ * modified.
  *
  * @package sqlite-diagnostics
  */
@@ -55,7 +56,7 @@ function sqlite_diagnostics_render_page() {
 
 	echo '<div class="wrap">';
 	echo '<h1>' . esc_html__( 'SQLite Diagnostics', 'sqlite-diagnostics' ) . '</h1>';
-	echo '<p>' . esc_html__( 'Read-only overview of the SQLite runtime. No settings are written and the live site database is never accessed.', 'sqlite-diagnostics' ) . '</p>';
+	echo '<p>' . esc_html__( 'Read-only overview of the SQLite runtime. Live PRAGMA values are read from the existing connection, but no settings or site data are modified.', 'sqlite-diagnostics' ) . '</p>';
 
 	foreach ( $groups as $title => $rows ) {
 		echo '<h2>' . esc_html( $title ) . '</h2>';
