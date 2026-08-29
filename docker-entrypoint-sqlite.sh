@@ -14,7 +14,8 @@
 set -Eeuo pipefail
 
 : "${WORDPRESS_PREPARE_DIR:=/usr/src/wordpress}"
-DOCROOT=/var/www/html
+: "${WORDPRESS_DOCROOT:=/var/www/html}"
+DOCROOT="${WORDPRESS_DOCROOT}"
 
 # Run the stock entrypoint's setup so it performs its volume seeding /
 # wp-config generation but does NOT start Apache/php-fpm. The stock script only
@@ -31,18 +32,70 @@ if [ -d "$src_content" ] && [ -d "$DOCROOT" ]; then
 
 	# The SQLite drop-in itself. Without this file WordPress uses MySQL.
 	if [ -f "$src_content/db.php" ]; then
-		if ! cmp -s "$src_content/db.php" "$dst_content/db.php"; then
+		if [ -L "$dst_content/db.php" ] || ! cmp -s "$src_content/db.php" "$dst_content/db.php"; then
 			echo >&2 "sqlite: installing wp-content/db.php SQLite drop-in into $dst_content"
+			# Never follow a user-provided symlink while running as root.
+			rm -f "$dst_content/db.php"
 			cp -f "$src_content/db.php" "$dst_content/db.php"
 		fi
 	fi
 
-	# The must-use plugins that back the drop-in (the driver, the loader that
-	# mounts the admin UI, and the SELECT id casing fix). mu-plugins are never
-	# persisted selectively by the stock entrypoint, so keep them in sync here.
-	if [ -d "$src_content/mu-plugins" ]; then
-		mkdir -p "$dst_content/mu-plugins"
-		cp -a "$src_content/mu-plugins/." "$dst_content/mu-plugins/"
+	# Replace the managed integration subtree instead of merging it. A recursive
+	# copy leaves PHP files removed by a newer upstream version in persisted
+	# volumes. Stage the replacement beside the live directory and keep a backup
+	# until the rename succeeds; unrelated user mu-plugins remain untouched.
+	src_mu_plugins="$src_content/mu-plugins"
+	dst_mu_plugins="$dst_content/mu-plugins"
+	managed_plugin="sqlite-database-integration"
+	managed_src="$src_mu_plugins/$managed_plugin"
+	managed_dst="$dst_mu_plugins/$managed_plugin"
+	managed_tmp="$dst_mu_plugins/.${managed_plugin}.new.$$"
+	managed_previous="$dst_mu_plugins/.${managed_plugin}.previous"
+
+	if [ -d "$src_mu_plugins" ]; then
+		mkdir -p "$dst_mu_plugins"
+
+		# Recover a replacement interrupted after the old tree was moved aside.
+		if [ ! -e "$managed_dst" ] && [ ! -L "$managed_dst" ] && [ -e "$managed_previous" ]; then
+			mv "$managed_previous" "$managed_dst"
+		fi
+
+		if [ -d "$managed_src" ] && { [ ! -d "$managed_dst" ] || ! diff -qr "$managed_src" "$managed_dst" >/dev/null 2>&1; }; then
+			echo >&2 "sqlite: replacing managed mu-plugin directory $managed_plugin"
+			rm -rf "$managed_tmp"
+			cp -a "$managed_src" "$managed_tmp"
+			rm -rf "$managed_previous"
+			if [ -e "$managed_dst" ] || [ -L "$managed_dst" ]; then
+				mv "$managed_dst" "$managed_previous"
+			fi
+			if mv "$managed_tmp" "$managed_dst"; then
+				rm -rf "$managed_previous"
+			else
+				rm -rf "$managed_tmp"
+				if [ -e "$managed_previous" ]; then
+					mv "$managed_previous" "$managed_dst"
+				fi
+				exit 1
+			fi
+		fi
+
+		# Root-level mu-plugin files are managed individually so custom siblings
+		# are preserved. Remove a destination symlink before copying as root.
+		managed_mu_plugin_files=(
+			"sqlite-database-integration-loader.php"
+			"sqlite-diagnostics.php"
+			"sqlite-select-id-key-fix.php"
+		)
+		for managed_file in "${managed_mu_plugin_files[@]}"; do
+			if [ -f "$src_mu_plugins/$managed_file" ]; then
+				if [ -L "$dst_mu_plugins/$managed_file" ] || ! cmp -s "$src_mu_plugins/$managed_file" "$dst_mu_plugins/$managed_file"; then
+					rm -f "$dst_mu_plugins/$managed_file"
+					cp -f "$src_mu_plugins/$managed_file" "$dst_mu_plugins/$managed_file"
+				fi
+			else
+				rm -f "$dst_mu_plugins/$managed_file"
+			fi
+		done
 	fi
 
 	# SQLite needs a writable directory for the database file.
