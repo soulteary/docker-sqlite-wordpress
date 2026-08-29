@@ -54,9 +54,11 @@ jobs:
             && [[ ! "${BASE_SHA}" =~ ^0+$ ]] \
             && git cat-file -e "${BASE_SHA}^{commit}" \
             && git diff --quiet "${BASE_SHA}" "${HEAD_SHA}" -- \
+              .github/workflows/ci.yaml \
               .dockerignore \
               Dockerfile \
               docker-entrypoint-sqlite.sh \
+              scripts/validate-release.sh \
               sqlite-database-integration-loader.php \
               sqlite-diagnostics.php \
               sqlite-select-id-key-fix.php; then
