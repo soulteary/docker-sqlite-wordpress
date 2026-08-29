@@ -92,6 +92,22 @@ Save the file as `docker-compose.yml` and then execute `docker compose up`, then
 
 Use the quick 1-minute initial installation, enjoy.
 
+## Deployment Suitability and Migration Boundary
+
+This image is intended for new WordPress installations and sites that already
+use SQLite. It is **not** a MySQL or MariaDB migration tool. Pointing an existing
+MySQL-backed WordPress volume at this image does not copy its database; the
+SQLite integration starts from a separate SQLite database. Migrate the content
+with a dedicated, verified migration workflow before switching images.
+
+SQLite supports concurrent readers but only one writer at a time. It is a good
+fit for local development and many small or read-heavy sites, but MySQL or
+MariaDB may be more appropriate for workloads with sustained concurrent writes.
+Before production use, test the expected traffic, themes, plugins, scheduled
+jobs, and backup/restore procedure. See the upstream
+[`sqlite-database-integration` production and migration guidance](https://github.com/WordPress/sqlite-database-integration/blob/v3.0.0/packages/plugin-sqlite-database-integration/readme.txt)
+for the underlying compatibility boundary.
+
 ## Emergency Site URL Recovery Tool
 
 > **Availability:** this tool was added to `main` after the immutable `7.1.0`
@@ -282,6 +298,94 @@ WordPress 7.1.0 / SQLite Database Integration 3.0.0 image. Version 3.0.0
 requires a non-empty `DB_NAME` in custom `wp-config.php` files and uses WAL
 journaling by default, so the database's `-wal` and `-shm` sidecar files must
 remain on the same persistent volume as the main SQLite file.
+
+### Safe Backup and Restore
+
+Do not copy only the main SQLite file while WordPress is running. Stop the
+container first so the database and its WAL sidecars form one consistent
+snapshot. For the repository's default `./wordpress` bind mount:
+
+```bash
+mkdir -p backups
+backup_archive="backups/wordpress-database-$(date -u +%Y%m%dT%H%M%SZ).tar.gz"
+docker compose stop wordpress
+tar -C ./wordpress/wp-content -czf "${backup_archive}" database
+docker compose start wordpress
+```
+
+For a named volume, replace `<wordpress-volume>` with the volume mounted at
+`/var/www/html`:
+
+```bash
+mkdir -p backups
+wordpress_volume="replace-with-your-wordpress-volume-name"
+docker compose stop wordpress
+docker run --rm \
+  --entrypoint tar \
+  --mount "type=volume,source=${wordpress_volume},target=/source,readonly" \
+  --mount type=bind,source="$(pwd)/backups",target=/backup \
+  soulteary/sqlite-wordpress:7.1.0 \
+  -C /source/wp-content -czf /backup/wordpress-database.tar.gz database
+docker compose start wordpress
+```
+
+Restore only while the container is stopped. Keep the current directory as a
+recoverable rollback copy instead of deleting it:
+
+```bash
+backup_archive="backups/replace-with-your-backup.tar.gz"
+docker compose stop wordpress
+mv ./wordpress/wp-content/database ./wordpress/wp-content/database.before-restore
+tar -C ./wordpress/wp-content -xzf "${backup_archive}"
+docker compose up -d
+```
+
+For a named volume, use the same image to retain the current database as a
+rollback directory before extracting the archive:
+
+```bash
+wordpress_volume="replace-with-your-wordpress-volume-name"
+docker compose stop wordpress
+docker run --rm \
+  --entrypoint bash \
+  --mount "type=volume,source=${wordpress_volume},target=/source" \
+  --mount type=bind,source="$(pwd)/backups",target=/backup,readonly \
+  soulteary/sqlite-wordpress:7.1.0 \
+  -ceu 'test ! -e /source/wp-content/database.before-restore
+        mv /source/wp-content/database /source/wp-content/database.before-restore
+        tar -C /source/wp-content -xzf /backup/wordpress-database.tar.gz'
+docker compose up -d
+```
+
+After a restore, verify the database through the active WordPress SQLite driver:
+
+```bash
+docker compose exec wordpress php -r '
+require "/var/www/html/wp-load.php";
+$pdo = $GLOBALS["wpdb"]->get_driver()->get_sqlite_pdo();
+$result = $pdo->query("PRAGMA integrity_check")->fetchColumn();
+fwrite(STDOUT, $result . PHP_EOL);
+exit("ok" === $result ? 0 : 1);
+'
+```
+
+Backups include the recovery tool's internal state files. After restoring or
+cloning a volume, keep the tool disabled during the first container start so its
+one-shot state is safely reset before any future recovery session.
+
+These examples protect the SQLite database only. Back up uploads, themes,
+plugins, and custom configuration separately when a full site restore is
+required.
+
+### SQLite Database Integration 3.0 Compatibility
+
+Custom configurations should also review the upstream
+[`3.0.0` breaking changes](https://github.com/WordPress/sqlite-database-integration/blob/v3.0.0/packages/plugin-sqlite-database-integration/readme.txt).
+In particular, `WP_SQLITE_AST_DRIVER` and `DATABASE_ENGINE` were removed;
+`DATABASE_TYPE`, `FQDBDIR`, and `FQDB` are deprecated; and integrations that
+used the old driver classes or `$GLOBALS['@pdo']` must move to the public v3
+driver APIs. These considerations apply to custom `wp-config.php` files and
+plugins; the image's bundled defaults already use the v3 layout.
 
 This image is **self-healing**: its entrypoint reconciles the SQLite drop-in
 (`wp-content/db.php`) and the SQLite must-use plugins into the live document

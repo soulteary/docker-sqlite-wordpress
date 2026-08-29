@@ -68,6 +68,10 @@ While not vulnerabilities in this image, the following practices reduce your exp
 - Always run the latest image tag and rebuild/pull regularly to receive updates.
 - Keep WordPress core, plugins, and themes updated from within the WordPress admin.
 - Protect the SQLite database file (mounted under `wp-content/database/`) with appropriate filesystem permissions and never expose it directly over the web.
+- Keep tested offline backups of the complete `wp-content/database/` directory.
+  Stop the container before a filesystem copy so the main database and WAL
+  sidecars are captured consistently; follow the README's safe backup and
+  restore procedure instead of copying only the main SQLite file.
 - Run the container behind a reverse proxy with TLS, and avoid exposing it directly to the public internet without hardening.
 - Use strong administrator credentials and limit access to the WordPress dashboard.
 - Leave the site URL recovery endpoint disabled except during a recovery. Use
