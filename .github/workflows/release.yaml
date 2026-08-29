@@ -1,0 +1,253 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY_IMAGE: soulteary/sqlite-wordpress
+  GHCR_IMAGE: ghcr.io/soulteary/sqlite-wordpress
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate release ref and project versions
+        id: release
+        env:
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ "${RELEASE_REF_TYPE}" != "tag" ]]; then
+            echo "::error::Release workflow must run from a tag, not ${RELEASE_REF_TYPE}."
+            exit 1
+          fi
+          ./scripts/validate-release.sh "${RELEASE_VERSION}"
+          echo "version=${RELEASE_VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ensure version tags do not already exist
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          for image in "${REGISTRY_IMAGE}" "${GHCR_IMAGE}"; do
+            if inspect_output="$(docker buildx imagetools inspect "${image}:${RELEASE_VERSION}" 2>&1)"; then
+              echo "::error::${image}:${RELEASE_VERSION} already exists; release tags are immutable."
+              exit 1
+            fi
+            if ! grep -Eqi 'manifest unknown|not found' <<< "${inspect_output}"; then
+              echo "::error::Unable to verify that ${image}:${RELEASE_VERSION} is unused."
+              printf '%s\n' "${inspect_output}"
+              exit 1
+            fi
+          done
+
+  build:
+    needs: preflight
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            qemu: false
+          - platform: linux/arm64
+            runner: ubuntu-26.04-arm
+            qemu: false
+          - platform: linux/arm/v7
+            runner: ubuntu-26.04-arm
+            qemu: true
+          - platform: linux/arm/v6
+            runner: ubuntu-26.04-arm
+            qemu: true
+          - platform: linux/arm/v5
+            runner: ubuntu-26.04-arm
+            qemu: true
+    steps:
+      - name: Prepare platform pair
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> "${GITHUB_ENV}"
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        if: ${{ matrix.qemu }}
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push to Docker Hub by digest
+        id: build-dockerhub
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Build and push to GHCR by digest
+        id: build-ghcr
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
+          outputs: type=image,name=${{ env.GHCR_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digests
+        env:
+          DOCKERHUB_DIGEST: ${{ steps.build-dockerhub.outputs.digest }}
+          GHCR_DIGEST: ${{ steps.build-ghcr.outputs.digest }}
+        run: |
+          set -euo pipefail
+          digest_pattern='^sha256:[0-9a-f]{64}$'
+          if [[ ! "${DOCKERHUB_DIGEST}" =~ ${digest_pattern} ]]; then
+            echo "::error::Invalid Docker Hub digest: ${DOCKERHUB_DIGEST}"
+            exit 1
+          fi
+          if [[ ! "${GHCR_DIGEST}" =~ ${digest_pattern} ]]; then
+            echo "::error::Invalid GHCR digest: ${GHCR_DIGEST}"
+            exit 1
+          fi
+          mkdir -p /tmp/digests/dockerhub /tmp/digests/ghcr
+          touch "/tmp/digests/dockerhub/${DOCKERHUB_DIGEST#sha256:}"
+          touch "/tmp/digests/ghcr/${GHCR_DIGEST#sha256:}"
+
+      - name: Upload digests
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs:
+      - preflight
+      - build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create versioned and latest manifests
+        run: |
+          set -euo pipefail
+
+          create_manifest() {
+            local image="$1"
+            local digest_dir="$2"
+            local -a digests=()
+            local -a sources=()
+
+            mapfile -t digests < <(find "${digest_dir}" -maxdepth 1 -type f -printf '%f\n' | sort)
+            if [[ "${#digests[@]}" -ne 5 ]]; then
+              echo "::error::Expected 5 digests for ${image}, found ${#digests[@]}."
+              exit 1
+            fi
+
+            for digest in "${digests[@]}"; do
+              if [[ ! "${digest}" =~ ^[0-9a-f]{64}$ ]]; then
+                echo "::error::Invalid digest file for ${image}: ${digest}"
+                exit 1
+              fi
+              sources+=("${image}@sha256:${digest}")
+            done
+
+            docker buildx imagetools create \
+              -t "${image}:${RELEASE_VERSION}" \
+              -t "${image}:latest" \
+              "${sources[@]}"
+          }
+
+          create_manifest "${REGISTRY_IMAGE}" /tmp/digests/dockerhub
+          create_manifest "${GHCR_IMAGE}" /tmp/digests/ghcr
+
+      - name: Inspect published manifests
+        run: |
+          set -euo pipefail
+          for image in "${REGISTRY_IMAGE}" "${GHCR_IMAGE}"; do
+            docker buildx imagetools inspect "${image}:${RELEASE_VERSION}"
+            docker buildx imagetools inspect "${image}:latest"
+          done
