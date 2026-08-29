@@ -23,6 +23,9 @@
 - Increased the direct recovery password minimum from 16 to 24 characters and
   documented generated credentials, private-network exposure, TLS, IP
   allowlists, and reverse-proxy rate limiting.
+- Made the documented URL contract strict at the server boundary: leading,
+  trailing, and internal whitespace are rejected, and the 2048-byte and valid
+  port-range limits are explicitly documented and tested.
 - Ignored the documented local `.env` file and `secrets/` directory so recovery
   credentials are not accidentally committed.
 

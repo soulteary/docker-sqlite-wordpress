@@ -234,11 +234,13 @@ site_url_tool_assert_throws(
 unlink( $site_url_tool_state_file );
 unlink( $state_symlink_target );
 
-$valid_urls = array(
+$max_length_url = 'https://example.com/' . str_repeat( 'a', 2028 );
+$valid_urls     = array(
 	'public URL'       => array( 'https://example.com/', 'https://example.com' ),
 	'local URL'        => array( 'http://localhost:8080/wordpress/', 'http://localhost:8080/wordpress' ),
 	'private IPv4 URL' => array( 'http://192.168.1.20:8080', 'http://192.168.1.20:8080' ),
 	'IPv6 URL'         => array( 'https://[::1]:8443/wp', 'https://[::1]:8443/wp' ),
+	'maximum length'    => array( $max_length_url, $max_length_url ),
 );
 foreach ( $valid_urls as $label => $case ) {
 	site_url_tool_assert_same(
@@ -257,10 +259,15 @@ $invalid_urls = array(
 	'fragment'           => 'https://example.com/#settings',
 	'invalid hostname'   => 'https://example%2ecom',
 	'invalid IPv6 host'  => 'https://[not-ipv6]/',
-	'whitespace'         => 'https://example.com/a b',
-	'backslash'          => 'https://example.com\\admin',
-	'dot path segment'   => 'https://example.com/a/../admin',
-	'non-string payload' => array( 'https://example.com' ),
+	'internal whitespace' => 'https://example.com/a b',
+	'leading whitespace'  => ' https://example.com',
+	'trailing whitespace' => "https://example.com\n",
+	'backslash'           => 'https://example.com\\admin',
+	'dot path segment'    => 'https://example.com/a/../admin',
+	'zero port'           => 'https://example.com:0',
+	'oversized port'      => 'https://example.com:65536',
+	'overlong URL'        => 'https://example.com/' . str_repeat( 'a', 2030 ),
+	'non-string payload'  => array( 'https://example.com' ),
 );
 foreach ( $invalid_urls as $label => $url ) {
 	site_url_tool_assert_throws(
