@@ -6,12 +6,6 @@ on:
       - "*.*.*"
   workflow_dispatch:
 
-concurrency:
-  # Serialize every version: otherwise a slower older release can finish last
-  # and move the shared `latest` tag backwards.
-  group: release
-  cancel-in-progress: false
-
 env:
   REGISTRY_IMAGE: soulteary/sqlite-wordpress
   GHCR_IMAGE: ghcr.io/soulteary/sqlite-wordpress
@@ -259,19 +253,9 @@ jobs:
             docker buildx imagetools inspect "${image}:${RELEASE_VERSION}"
           done
 
-      - name: Promote version to latest
-        run: |
-          set -euo pipefail
-          for image in "${REGISTRY_IMAGE}" "${GHCR_IMAGE}"; do
-            docker buildx imagetools create \
-              -t "${image}:latest" \
-              "${image}:${RELEASE_VERSION}"
-          done
-
-      - name: Inspect published manifests
+      - name: Inspect published version manifests
         run: |
           set -euo pipefail
           for image in "${REGISTRY_IMAGE}" "${GHCR_IMAGE}"; do
             docker buildx imagetools inspect "${image}:${RELEASE_VERSION}"
-            docker buildx imagetools inspect "${image}:latest"
           done
