@@ -4,14 +4,14 @@ Thank you for helping keep **Docker SQLite WordPress** and its users safe. This 
 
 ## Scope
 
-This project packages the official [WordPress image](https://hub.docker.com/_/wordpress) together with [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration), its optional native Rust accelerator `wp_mysql_parser`, and a small companion must-use plugin (`sqlite-select-id-key-fix.php`).
+This project packages the official [WordPress image](https://hub.docker.com/_/wordpress) together with [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration), its optional native Rust accelerator `wp_mysql_parser`, and project-owned entrypoint, diagnostics, compatibility, and recovery components.
 
 This policy covers issues **introduced by this project**, including:
 
-- The `Dockerfile` and the way the image is assembled (build stages, permissions, bundled files).
-- The companion must-use plugin `sqlite-select-id-key-fix.php`.
+- The `Dockerfile`, `docker-entrypoint-sqlite.sh`, and the way the image is assembled and reconciled (build stages, permissions, bundled files, and persistent volumes).
+- The project-owned must-use loader, `sqlite-diagnostics.php`, and `sqlite-select-id-key-fix.php` components.
 - The disabled-by-default, credential-protected `/tool-update-site-url.php`
-  recovery endpoint.
+  recovery endpoint and its persistent throttle/one-shot state handling.
 - The packaging and configuration of the native `wp_mysql_parser` extension.
 - The release workflows under `.github/workflows/`.
 
@@ -77,10 +77,10 @@ While not vulnerabilities in this image, the following practices reduce your exp
 - Leave the site URL recovery endpoint disabled except during a recovery. Use
   the exact `WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true` switch together with
   exactly one credential source. Prefer `WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE`
-  with a randomly generated token; direct `WORDPRESS_SITE_URL_UPDATE_TOKEN` and
-  `WORDPRESS_SITE_URL_UPDATE_PASSWORD` values are visible in container
-  environment metadata. Send credentials only over TLS on untrusted networks,
-  then remove the enable switch and credential immediately after the repair.
+  with a randomly generated token; a direct
+  `WORDPRESS_SITE_URL_UPDATE_PASSWORD` value is visible in container environment
+  metadata. Send credentials only over TLS on untrusted networks, then remove
+  the enable switch and credential immediately after the repair.
 - The recovery endpoint globally locks for 15 minutes after five invalid
   credentials in one 15-minute window. This blocks distributed guessing but can
   also let an exposed attacker temporarily delay the operator. Restrict the

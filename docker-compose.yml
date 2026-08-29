@@ -20,7 +20,7 @@ services:
 
       # TOKEN_FILE is preferred for shared or internet-reachable hosts. Uncomment
       # this line and the service/top-level secrets blocks below. Leave PASSWORD
-      # unset or empty: TOKEN_FILE, TOKEN, and PASSWORD are mutually exclusive.
+      # unset or empty: TOKEN_FILE and PASSWORD are mutually exclusive.
       # WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE: /run/secrets/site-url-update-token
     # secrets:
     #   - site-url-update-token

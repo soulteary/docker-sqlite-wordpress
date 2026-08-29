@@ -6,7 +6,7 @@
 
 - Added a disabled-by-default `/tool-update-site-url.php` recovery page that
   requires both an explicit environment enable switch and one strong credential
-  supplied through a token file, direct token, or password, then atomically
+  supplied through a token file or direct password, then atomically
   updates the WordPress `siteurl` and `home` options after a domain, scheme,
   port, or path change.
 
@@ -26,6 +26,9 @@
 - Made the documented URL contract strict at the server boundary: leading,
   trailing, and internal whitespace are rejected, and the 2048-byte and valid
   port-range limits are explicitly documented and tested.
+- Removed the redundant direct `WORDPRESS_SITE_URL_UPDATE_TOKEN` mode before
+  release. TOKEN_FILE remains the file-backed secret option and PASSWORD remains
+  the single direct environment-value option.
 - Ignored the documented local `.env` file and `secrets/` directory so recovery
   credentials are not accidentally committed.
 

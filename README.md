@@ -143,12 +143,12 @@ Choose exactly one of these credential sources:
 | Variable | Minimum length | Notes |
 | --- | ---: | --- |
 | `WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE` | 32 characters | Preferred. Reads a Docker secret or mounted file. |
-| `WORDPRESS_SITE_URL_UPDATE_TOKEN` | 32 characters | Direct token; visible in container environment metadata. |
 | `WORDPRESS_SITE_URL_UPDATE_PASSWORD` | 24 characters | Direct password; visible in container environment metadata. Use a generated value or long passphrase. |
 
 The generic variable `PASSWORD` is intentionally ignored to avoid collisions
-with unrelated software. Do not configure more than one source at the same
-time.
+with unrelated software. Configure either TOKEN_FILE for a file-backed token or
+PASSWORD for a direct environment value; do not configure both supported
+sources at the same time.
 
 Authentication is globally throttled across all PHP workers. Five failed
 credentials within 15 minutes lock the endpoint for 15 minutes and return
@@ -317,7 +317,7 @@ endpoint intentionally avoids returning sensitive configuration details.
 | HTTP status | Meaning | Action |
 | ---: | --- | --- |
 | `404` | Disabled, missing credential, or one-shot authorization already used. | Check the exact enable value and follow the deliberate rearm sequence if a previous attempt consumed it. |
-| `403` | Invalid credential before the failure threshold. | Check the selected TOKEN_FILE, TOKEN, or PASSWORD source; do not configure multiple sources. |
+| `403` | Invalid credential before the failure threshold. | Check the selected TOKEN_FILE or PASSWORD source; do not configure both sources. |
 | `405` | Unsupported request method. | Open with GET and submit the form with POST. |
 | `409` | Another authenticated request is active, Multisite is enabled, or `WP_HOME` / `WP_SITEURL` overrides the database. | Wait for the active request, or correct the unsupported WordPress configuration. |
 | `422` | A submitted URL failed validation. | Apply the accepted URL rules above and submit both fields again. |
