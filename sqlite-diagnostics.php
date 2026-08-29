@@ -77,7 +77,7 @@ function sqlite_diagnostics_render_page() {
 /**
  * Collects native wp_mysql_parser extension state and the resulting parse path.
  *
- * Upstream (sqlite-database-integration v3.0.0-rc.8) decides the native lexer
+ * Upstream (sqlite-database-integration v3.0.0) decides the native lexer
  * and parser independently via class_exists( ..., false ) rather than
  * extension_loaded(). Either side can fall back to pure PHP on its own, so both
  * are reported separately and the active parse path is only "fully accelerated"
@@ -144,23 +144,32 @@ function sqlite_diagnostics_sqlite() {
 
 /**
  * Resolves the live PDO connection used by the running site, without opening a
- * new database. Prefers the PDO instance the driver injects into
- * $GLOBALS['@pdo']; otherwise reaches it through the wpdb driver connection.
- * Every level is guarded and any failure degrades to null (no fallback to an
- * in-memory database, which would misrepresent the live PRAGMA state).
+ * new database. Prefers the public v3 driver API and retains guarded fallbacks
+ * for older integration releases. Any failure degrades to null (no fallback
+ * to an in-memory database, which would misrepresent the live PRAGMA state).
  *
  * @return PDO|null The live PDO connection, or null when unavailable.
  */
 function sqlite_diagnostics_get_live_pdo() {
-	if ( isset( $GLOBALS['@pdo'] ) && $GLOBALS['@pdo'] instanceof PDO ) {
-		return $GLOBALS['@pdo'];
-	}
-
 	try {
-		if ( isset( $GLOBALS['wpdb'] ) && isset( $GLOBALS['wpdb']->dbh ) ) {
-			$dbh = $GLOBALS['wpdb']->dbh;
-			if ( is_object( $dbh ) && method_exists( $dbh, 'get_connection' ) ) {
-				$connection = $dbh->get_connection();
+		if ( isset( $GLOBALS['wpdb'] ) && is_object( $GLOBALS['wpdb'] ) ) {
+			$driver = null;
+
+			if ( method_exists( $GLOBALS['wpdb'], 'get_driver' ) ) {
+				$driver = $GLOBALS['wpdb']->get_driver();
+			} elseif ( isset( $GLOBALS['wpdb']->dbh ) ) {
+				$driver = $GLOBALS['wpdb']->dbh;
+			}
+
+			if ( is_object( $driver ) && method_exists( $driver, 'get_sqlite_pdo' ) ) {
+				$pdo = $driver->get_sqlite_pdo();
+				if ( $pdo instanceof PDO ) {
+					return $pdo;
+				}
+			}
+
+			if ( is_object( $driver ) && method_exists( $driver, 'get_connection' ) ) {
+				$connection = $driver->get_connection();
 				if ( is_object( $connection ) && method_exists( $connection, 'get_pdo' ) ) {
 					$pdo = $connection->get_pdo();
 					if ( $pdo instanceof PDO ) {
@@ -171,6 +180,10 @@ function sqlite_diagnostics_get_live_pdo() {
 		}
 	} catch ( Exception $e ) {
 		return null;
+	}
+
+	if ( isset( $GLOBALS['@pdo'] ) && $GLOBALS['@pdo'] instanceof PDO ) {
+		return $GLOBALS['@pdo'];
 	}
 
 	return null;

@@ -3,8 +3,8 @@ version: '3'
 services:
 
   wordpress:
-    image: soulteary/sqlite-wordpress:7.0.2
-    # or use: ghcr.io/soulteary/sqlite-wordpress:7.0.2
+    image: soulteary/sqlite-wordpress:7.1.0
+    # or use: ghcr.io/soulteary/sqlite-wordpress:7.1.0
     restart: always
     ports:
       - 8080:80

@@ -35,13 +35,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  *    WP_SQLite_Translator and expose the `pre_query_sqlite_db` filter, which
  *    lets us intercept and rewrite the *result set* directly.
  *
- *  - 3.0.0-rc.8+ replaced that with a wpdb-style WP_SQLite_DB whose result
+ *  - 3.0.0 replaced that with a wpdb-style WP_SQLite_DB whose result
  *    fetching is not filterable; the only query-time hook left is the standard
  *    `query` filter, which can only rewrite the *SQL statement*. There we add
  *    an explicit quoted alias (e.g. `P.id` -> `P.id AS "id"`) so SQLite echoes
  *    the written casing back as the column key.
  *
- * Registering both is safe: rc.8 never fires `pre_query_sqlite_db`, and on the
+ * Registering both is safe: 3.0.0 never fires `pre_query_sqlite_db`, and on the
  * older path the `query` rewrite is idempotent (once aliased, the result-set
  * rename becomes a no-op because the keys already match).
  */
@@ -98,7 +98,7 @@ function sqlite_select_id_key_fix_run_probe() {
 	$array_ok  = is_array( $array_row ) && array_key_exists( 'id', $array_row );
 	$object_ok = is_object( $object_row ) && property_exists( $object_row, 'id' );
 
-	// The rc.8 path proves itself through the rewritten SQL alias; the older
+	// The 3.0.0 path proves itself through the rewritten SQL alias; the older
 	// result-set path proves itself through the ARRAY_A / OBJECT keys.
 	$has_alias = (bool) preg_match( '/P\.id\s+AS\s+"id"/i', $filtered_sql );
 
@@ -256,7 +256,7 @@ function sqlite_select_id_key_fix_build_rename_map( $statement ) {
  * safe single-table SELECT we are willing to touch, or null otherwise.
  *
  * Shared by both integration paths so their safety judgement stays identical:
- * the older `pre_query_sqlite_db` result rewriter and the rc.8 `query` SQL
+ * the older `pre_query_sqlite_db` result rewriter and the 3.0.0 `query` SQL
  * rewriter must agree on exactly which statements are in scope.
  *
  * @param string $statement The original MySQL statement.
@@ -337,11 +337,11 @@ function sqlite_select_id_key_fix_column_written_name( $column ) {
 }
 
 /**
- * rc.8 `query` filter: rewrites a safe single-table SELECT so each bare column
+ * 3.0.0 `query` filter: rewrites a safe single-table SELECT so each bare column
  * reference gains an explicit quoted alias matching the written casing (e.g.
  * `SELECT P.id FROM ...` -> `SELECT P.id AS "id" FROM ...`). SQLite echoes an
  * aliased column back verbatim, so the result key keeps the written casing
- * without needing a (non-existent in rc.8) result-set filter.
+ * without needing a (non-existent in 3.0.0) result-set filter.
  *
  * The statement is returned unchanged whenever it is not a query we handle.
  *
