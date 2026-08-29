@@ -5,6 +5,11 @@ on:
     tags:
       - "*.*.*"
   workflow_dispatch:
+    inputs:
+      force_overwrite:
+        description: "Force override: Skip existing tag detection and directly update the image tag."
+        type: boolean
+        default: false
 
 env:
   REGISTRY_IMAGE: soulteary/sqlite-wordpress
@@ -61,6 +66,7 @@ jobs:
           ./scripts/validate-release.sh "${RELEASE_VERSION}" --verify-upstream
 
       - name: Ensure version tags do not already exist
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.force_overwrite != true }}
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
