@@ -3,12 +3,12 @@ services:
   wordpress:
     image: soulteary/sqlite-wordpress:7.1.0
     # or use: ghcr.io/soulteary/sqlite-wordpress:7.1.0
-    # The recovery tool was added after 7.1.0. Until the next release, run
-    # `docker build -t sqlite-wordpress:site-url-recovery .` and replace the
-    # image above with `sqlite-wordpress:site-url-recovery`.
     restart: always
     ports:
-      - 8080:80
+      # Safe local default. Replace 127.0.0.1 only when intentionally publishing
+      # the site through a firewall or TLS reverse proxy. Keep the recovery path
+      # private or IP-allowlisted whenever the tool is enabled.
+      - 127.0.0.1:8080:80
     environment:
       # Emergency site URL recovery stays disabled during normal operation.
       # To use the short-lived PASSWORD mode, export both host variables and
