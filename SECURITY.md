@@ -31,7 +31,7 @@ Security fixes are applied to the latest released image tag only. Because image 
 | Older releases  | :x:                |
 
 - `soulteary/sqlite-wordpress:latest` (Docker Hub) and `ghcr.io/soulteary/sqlite-wordpress:latest` (GHCR) always point to the most recent build.
-- Pinned version tags (e.g. `7.0.2`) are immutable snapshots and do **not** receive back-ported fixes. Upgrade to a newer tag to pick up security updates.
+- Pinned version tags (e.g. `7.1.0`) are immutable snapshots and do **not** receive back-ported fixes. Upgrade to a newer tag to pick up security updates.
 
 ## Reporting a Vulnerability
 

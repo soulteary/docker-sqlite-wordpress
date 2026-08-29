@@ -11,7 +11,7 @@ WordPress with SQLite, ready to use out of the box.
 
 ## Native MySQL Parser Extension
 
-The image bundles [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration) `7.0.2-plugin-v3.0.0-rc.8` together with its optional native Rust extension `wp_mysql_parser`, which is compiled during the Docker build and enabled by default. The SQLite driver automatically detects the extension and switches to the native fast path (roughly 4.8x faster lexer and 15.5x faster parser per upstream benchmarks).
+The image bundles WordPress `7.1.0` on PHP 8.2/Apache and [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration) `v3.0.0` together with its optional native Rust extension `wp_mysql_parser`, which is compiled during the Docker build and enabled by default. The SQLite driver automatically detects the extension and switches to the native fast path (roughly 4.8x faster lexer and 15.5x faster parser per upstream benchmarks).
 
 Verify it is loaded inside the container:
 
@@ -56,11 +56,11 @@ You can download GitHub's clean and secure docker image using the following comm
 # Docker Hub: use latest
 docker pull soulteary/sqlite-wordpress
 # Docker Hub: use specify version
-docker pull soulteary/sqlite-wordpress:7.0.2
+docker pull soulteary/sqlite-wordpress:7.1.0
 # GHCR: use latest
 docker pull ghcr.io/soulteary/sqlite-wordpress:latest
 # GHCR: use specify version
-docker pull ghcr.io/soulteary/sqlite-wordpress:7.0.2
+docker pull ghcr.io/soulteary/sqlite-wordpress:7.1.0
 ```
 
 Use the following command to quickly launch the wordpress with port `8080`:
@@ -79,8 +79,8 @@ version: '3'
 services:
 
   wordpress:
-    image: soulteary/sqlite-wordpress:7.0.2
-    # or use: ghcr.io/soulteary/sqlite-wordpress:7.0.2
+    image: soulteary/sqlite-wordpress:7.1.0
+    # or use: ghcr.io/soulteary/sqlite-wordpress:7.1.0
     restart: always
     ports:
       - 8080:80
@@ -95,6 +95,12 @@ Save the file as `docker-compose.yml` and then execute `docker compose up`, then
 Use the quick 1-minute initial installation, enjoy.
 
 ### Volume / upgrade note
+
+Back up `wp-content/database/` before upgrading an existing site to the
+WordPress 7.1.0 / SQLite Database Integration 3.0.0 image. Version 3.0.0
+requires a non-empty `DB_NAME` in custom `wp-config.php` files and uses WAL
+journaling by default, so the database's `-wal` and `-shm` sidecar files must
+remain on the same persistent volume as the main SQLite file.
 
 This image is **self-healing**: its entrypoint reconciles the SQLite drop-in
 (`wp-content/db.php`) and the SQLite must-use plugins into the live document
