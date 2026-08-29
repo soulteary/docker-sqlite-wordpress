@@ -15,6 +15,17 @@ Release tags follow the bundled WordPress version, for example `7.1.0`. A tag pu
    ./scripts/validate-release.sh 7.1.0
    ```
 
+   Then validate documentation links and both the default and enabled PASSWORD
+   Compose configurations:
+
+   ```bash
+   bash tests/test-documentation.sh
+   docker compose config --quiet
+   WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true \
+   WORDPRESS_SITE_URL_UPDATE_PASSWORD=release-validation-password \
+     docker compose config --quiet
+   ```
+
 3. Complete the runtime checks described in the pull request, including the
    native parser and pure-PHP fallback paths. Run
    `tests/image-smoke-site-url.php` against the built image and verify the

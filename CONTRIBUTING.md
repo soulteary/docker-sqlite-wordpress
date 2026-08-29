@@ -29,9 +29,14 @@ There are many ways to get involved with this project:
 
 Make sure you have the following set up locally:
 
-- [Docker](https://docs.docker.com/get-docker/) 20.10+ (with [Buildx](https://docs.docker.com/build/buildx/) support)
+- [Docker](https://docs.docker.com/get-docker/) 20.10+ with Compose v2 and [Buildx](https://docs.docker.com/build/buildx/) support
 - [QEMU](https://docs.docker.com/build/building/multi-platform/) enabled, if you want to build multi-arch images
-- Git
+- Bash 4.4+, Git, PHP 8.1+, `curl`, `jq`, `tar`, and GNU core utilities
+- [ShellCheck](https://www.shellcheck.net/) 0.11.0 and [actionlint](https://github.com/rhysd/actionlint) 1.7.12 when reproducing all CI lint checks locally
+
+The runtime image uses PHP 8.5. PHP 8.1 is the minimum for local endpoint tests
+because the recovery state writer uses `fsync()`. CI pins the ShellCheck and
+actionlint versions shown above so local results can match CI.
 
 Fork the repository and clone it locally:
 
@@ -58,16 +63,31 @@ Once started, visit `http://localhost:8080` to reach the WordPress setup wizard.
 
 ```bash
 docker build -t soulteary/sqlite-wordpress:dev .
-docker run --rm -it -p 8080:80 -v "$(pwd)/wordpress:/var/www/html" soulteary/sqlite-wordpress:dev
+docker run --rm -it -p 127.0.0.1:8080:80 -v "$(pwd)/wordpress:/var/www/html" soulteary/sqlite-wordpress:dev
 ```
 
 ### Multi-Arch Build
 
 This project supports `linux/amd64`, `linux/arm64`, `linux/arm/v7`, `linux/arm/v6`, and `linux/arm/v5`. The native Rust extension is compiled only on `amd64` and `arm64`; the other 32-bit ARM platforms automatically skip it and fall back to the pure-PHP parser (see the comments in the `Dockerfile`).
 
+Build and load one host-compatible platform for local execution:
+
 ```bash
-docker buildx build --platform linux/amd64,linux/arm64 -t soulteary/sqlite-wordpress:dev .
+docker buildx build --load --platform linux/amd64 -t soulteary/sqlite-wordpress:dev .
 ```
+
+For a multi-platform result, explicitly select an OCI archive output. Buildx
+cannot load a multi-platform image into the classic local Docker image store:
+
+```bash
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --output type=oci,dest=/tmp/sqlite-wordpress-dev.oci \
+  .
+```
+
+Use `--push` with an authorized test registry only when remote publication is
+intentional; contributors should never push release tags from local builds.
 
 ### Repository Tests
 
@@ -75,10 +95,28 @@ Run the complete fast test set before opening a pull request:
 
 ```bash
 bash tests/test-entrypoint-reconcile.sh
+bash tests/test-documentation.sh
 bash tests/test-validate-release.sh
 php tests/test-sqlite-select-id-key-fix.php
 php tests/test-tool-update-site-url.php
 ./scripts/validate-release.sh 7.1.0
+```
+
+To reproduce the remaining lint checks:
+
+```bash
+mapfile -d '' shell_files < <(find . -type f -name '*.sh' -print0)
+shellcheck "${shell_files[@]}"
+
+while IFS= read -r -d '' php_file; do
+  php -l "${php_file}"
+done < <(find . -type f -name '*.php' -print0)
+
+actionlint
+docker compose config --quiet
+WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true \
+WORDPRESS_SITE_URL_UPDATE_PASSWORD=development-only-password \
+  docker compose config --quiet
 ```
 
 CI additionally lints every PHP and shell file, runs ShellCheck and actionlint,

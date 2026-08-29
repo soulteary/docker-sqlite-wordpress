@@ -9,6 +9,19 @@ WordPress with SQLite, ready to use out of the box.
 - GHCR Page: https://github.com/soulteary/docker-sqlite-wordpress/pkgs/container/sqlite-wordpress
 - Ships the optional native [`wp_mysql_parser`](https://wordpress.github.io/sqlite-database-integration/native-extension/) PHP extension for a faster MySQL lexer/parser path.
 
+## Documentation
+
+- [Native MySQL Parser Extension](#native-mysql-parser-extension)
+- [SQLite Diagnostics Page](#sqlite-diagnostics-page)
+- [SELECT id Key Case Fix](#select-id-key-case-fix)
+- [Quick Start](#quick-start)
+- [Deployment Suitability and Migration Boundary](#deployment-suitability-and-migration-boundary)
+- [Emergency Site URL Recovery Tool](#emergency-site-url-recovery-tool)
+- [Volume and Upgrade Notes](#volume-and-upgrade-notes)
+- [Contributing](#contributing)
+- [Security](#security)
+- [License](#license)
+
 ## Native MySQL Parser Extension
 
 The image bundles WordPress `7.1.0` on PHP 8.5/Apache and [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration) `v3.0.0` together with its optional native Rust extension `wp_mysql_parser`. The extension is compiled and enabled on `amd64` and `arm64`; published 32-bit ARM variants use the plugin's pure-PHP fallback. The SQLite driver detects the available implementation automatically (the upstream project reports roughly 4.8x faster lexing and 15.5x faster parsing for the native path).
@@ -50,20 +63,20 @@ docker exec -it <container> ls -l /var/www/html/wp-content/mu-plugins/
 
 ## Quick Start
 
-You can download GitHub's clean and secure docker image using the following command:
+Pull the image from Docker Hub or GHCR:
 
 ```bash
-# Docker Hub: use latest
+# Docker Hub: latest
 docker pull soulteary/sqlite-wordpress
-# Docker Hub: use specify version
+# Docker Hub: immutable version tag
 docker pull soulteary/sqlite-wordpress:7.1.0
-# GHCR: use latest
+# GHCR: latest
 docker pull ghcr.io/soulteary/sqlite-wordpress:latest
-# GHCR: use specify version
+# GHCR: immutable version tag
 docker pull ghcr.io/soulteary/sqlite-wordpress:7.1.0
 ```
 
-Use the following command to quickly launch the wordpress with port `8080`:
+Use the following command to launch WordPress on local port `8080`:
 
 ```bash
 docker run --rm -it -p 127.0.0.1:8080:80 -v "$(pwd)/wordpress:/var/www/html" soulteary/sqlite-wordpress
@@ -71,7 +84,7 @@ docker run --rm -it -p 127.0.0.1:8080:80 -v "$(pwd)/wordpress:/var/www/html" sou
 docker run --rm -it -p 127.0.0.1:8080:80 -v "$(pwd)/wordpress:/var/www/html" ghcr.io/soulteary/sqlite-wordpress:latest
 ```
 
-You can also use docker compose to start wordpress:
+You can also use Docker Compose to start WordPress:
 
 ```yaml
 services:
@@ -459,3 +472,12 @@ Contributions are welcome! Please read the [Contributing Guide](./CONTRIBUTING.m
 ## Security
 
 Found a security issue? Please review our [Security Policy](./SECURITY.md) and report it privately instead of opening a public issue.
+
+## License
+
+Project-authored source in this repository is licensed under the
+[Apache License 2.0](./LICENSE). The built image also contains WordPress,
+SQLite Database Integration, the native parser, and base-image packages under
+their respective licenses. See the [release history](./CHANGELOG.md) and
+[GitHub Releases](https://github.com/soulteary/docker-sqlite-wordpress/releases)
+for version-specific changes.

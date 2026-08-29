@@ -83,6 +83,17 @@ jobs:
           ./scripts/validate-release.sh "${release_versions[0]}"
           echo "release_version=${release_versions[0]}" >> "${GITHUB_OUTPUT}"
 
+      - name: Validate Compose examples
+        env:
+          WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED: "true"
+          WORDPRESS_SITE_URL_UPDATE_PASSWORD: development-only-password
+        run: |
+          set -euo pipefail
+          env -u WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED \
+              -u WORDPRESS_SITE_URL_UPDATE_PASSWORD \
+            docker compose config --quiet
+          docker compose config --quiet
+
       - name: Lint shell scripts
         run: |
           set -euo pipefail

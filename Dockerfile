@@ -82,7 +82,7 @@ LABEL org.opencontainers.image.authors="soulteary@gmail.com" \
       org.opencontainers.image.title="Docker SQLite WordPress" \
       org.opencontainers.image.description="WordPress with SQLite, ready to use out of the box" \
       org.opencontainers.image.version="7.1.0" \
-      org.opencontainers.image.licenses="GPL-2.0-or-later AND MIT"
+      org.opencontainers.image.licenses="Apache-2.0 AND GPL-2.0-or-later AND MIT"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV WORDPRESS_PREPARE_DIR=/usr/src/wordpress
