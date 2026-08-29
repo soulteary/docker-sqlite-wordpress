@@ -5,8 +5,9 @@
  * This file intentionally lives in the document root instead of inside
  * WordPress. It remains reachable when an incorrect `home` or `siteurl` option
  * makes the normal site and wp-admin inaccessible. The endpoint is disabled
- * unless WORDPRESS_SITE_URL_UPDATE_TOKEN or
- * WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE supplies a strong token.
+ * unless WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED is exactly `true` and
+ * WORDPRESS_SITE_URL_UPDATE_TOKEN or WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE
+ * supplies a strong token.
  *
  * @package docker-sqlite-wordpress
  */
@@ -35,6 +36,20 @@ function sqlite_wordpress_site_url_tool_send_headers() {
  */
 function sqlite_wordpress_site_url_tool_escape( $value ) {
 	return htmlspecialchars( (string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+}
+
+/**
+ * Checks the explicit, fail-closed recovery-tool enable switch.
+ *
+ * Only the exact lowercase value `true` enables the endpoint. Values such as
+ * `1`, `yes`, or `TRUE` remain disabled so a loosely parsed environment value
+ * cannot expose the recovery form accidentally.
+ *
+ * @return bool Whether the recovery endpoint is explicitly enabled.
+ */
+function sqlite_wordpress_site_url_tool_is_enabled() {
+	$enabled = getenv( 'WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED' );
+	return false !== $enabled && hash_equals( 'true', $enabled );
 }
 
 /**
@@ -219,7 +234,7 @@ function sqlite_wordpress_site_url_tool_render( $title, $message, $status = 'inf
 			<?php elseif ( 'success' === $status_class ) : ?>
 				<p><strong>WordPress Address:</strong> <code><?php echo sqlite_wordpress_site_url_tool_escape( $wordpress_url ); ?></code></p>
 				<p><strong>Site Address:</strong> <code><?php echo sqlite_wordpress_site_url_tool_escape( $site_url ); ?></code></p>
-				<p>Disable the recovery tool now by removing its token configuration and restarting the container.</p>
+				<p>Disable the recovery tool now by removing its enable switch and token configuration, then restart the container.</p>
 			<?php endif; ?>
 		</section>
 	</main>
@@ -296,6 +311,11 @@ function sqlite_wordpress_site_url_tool_update_options( $wordpress_url, $site_ur
  */
 function sqlite_wordpress_site_url_tool_main() {
 	sqlite_wordpress_site_url_tool_send_headers();
+	if ( ! sqlite_wordpress_site_url_tool_is_enabled() ) {
+		http_response_code( 404 );
+		echo 'Not Found';
+		return;
+	}
 
 	try {
 		$configured_token = sqlite_wordpress_site_url_tool_configured_token();

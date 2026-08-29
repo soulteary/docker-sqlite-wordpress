@@ -43,7 +43,17 @@ function site_url_tool_assert_throws( $callback, $exception, $label ) {
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN' );
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE' );
 putenv( 'SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED' );
-site_url_tool_assert_same( null, sqlite_wordpress_site_url_tool_configured_token(), 'tool disabled without a token' );
+putenv( 'WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED' );
+site_url_tool_assert_same( false, sqlite_wordpress_site_url_tool_is_enabled(), 'tool is disabled without an enable switch' );
+
+$disabled_values = array( '', '0', '1', 'yes', 'on', 'TRUE', 'true ' );
+foreach ( $disabled_values as $disabled_value ) {
+	putenv( 'WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=' . $disabled_value );
+	site_url_tool_assert_same( false, sqlite_wordpress_site_url_tool_is_enabled(), 'non-exact enable value remains disabled: ' . $disabled_value );
+}
+putenv( 'WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true' );
+site_url_tool_assert_same( true, sqlite_wordpress_site_url_tool_is_enabled(), 'exact lowercase true enables the tool' );
+site_url_tool_assert_same( null, sqlite_wordpress_site_url_tool_configured_token(), 'enabled tool still requires a token' );
 
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN=too-short' );
 site_url_tool_assert_throws(
@@ -83,6 +93,7 @@ unlink( $token_file );
 putenv( 'SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED=' . str_repeat( 'c', 64 ) );
 site_url_tool_assert_same( str_repeat( 'c', 64 ), sqlite_wordpress_site_url_tool_configured_token(), 'entrypoint-resolved secret is accepted' );
 putenv( 'SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED' );
+putenv( 'WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED' );
 
 $valid_urls = array(
 	'public URL'       => array( 'https://example.com/', 'https://example.com' ),

@@ -71,6 +71,7 @@ While not vulnerabilities in this image, the following practices reduce your exp
 - Run the container behind a reverse proxy with TLS, and avoid exposing it directly to the public internet without hardening.
 - Use strong administrator credentials and limit access to the WordPress dashboard.
 - Leave the site URL recovery endpoint disabled except during a recovery. Use
-  `WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE` with a randomly generated token, send
-  it only over TLS on untrusted networks, and remove the token configuration
-  immediately after the repair.
+  the exact `WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true` switch together with
+  `WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE` and a randomly generated token. Send
+  the token only over TLS on untrusted networks, then remove both environment
+  settings immediately after the repair.

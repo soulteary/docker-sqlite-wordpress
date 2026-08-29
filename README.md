@@ -104,9 +104,15 @@ transaction:
   are located).
 - **Site Address (URL)** → the `home` option (the public visitor-facing URL).
 
-The endpoint is disabled by default and returns `404 Not Found` until a strong
-recovery token is configured. A Docker secret is preferred so the token does
-not appear in `docker inspect` output:
+The endpoint is disabled by default and returns `404 Not Found` unless both of
+these independent conditions are met:
+
+1. `WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED` is set to the exact lowercase value
+   `true`.
+2. A strong recovery token is configured.
+
+Values such as `1`, `yes`, or `TRUE` do not enable the tool. A Docker secret is
+preferred for the token so it does not appear in `docker inspect` output:
 
 ```bash
 mkdir -p secrets
@@ -122,6 +128,7 @@ services:
     ports:
       - 8080:80
     environment:
+      WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED: "true"
       WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE: /run/secrets/site-url-update-token
     secrets:
       - site-url-update-token
@@ -136,12 +143,14 @@ secrets:
 Recreate the container, then open
 `http://localhost:8080/tool-update-site-url.php`. Enter the generated token and
 the two desired addresses. The token is accepted only in the POST body; never
-append it to the URL. When the site works at its new address, remove the token
-configuration and recreate the container so the endpoint returns 404 again.
+append it to the URL. When the site works at its new address, remove both
+`WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED` and the token configuration, then
+recreate the container so the endpoint returns 404 again.
 
 For a short-lived local recovery, the token can instead be passed directly as
 `WORDPRESS_SITE_URL_UPDATE_TOKEN`. Generate it with `openssl rand -hex 32` and
-use TLS whenever the endpoint is reachable across an untrusted network.
+set `WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true` at the same time. Use TLS
+whenever the endpoint is reachable across an untrusted network.
 
 The tool intentionally refuses WordPress Multisite installations. It also
 refuses to write when `WP_HOME` or `WP_SITEURL` is defined in `wp-config.php`,
