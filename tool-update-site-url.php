@@ -6,8 +6,8 @@
  * WordPress. It remains reachable when an incorrect `home` or `siteurl` option
  * makes the normal site and wp-admin inaccessible. The endpoint is disabled
  * unless WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED is exactly `true` and
- * WORDPRESS_SITE_URL_UPDATE_TOKEN, WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE, or
- * WORDPRESS_SITE_URL_UPDATE_PASSWORD supplies one strong credential.
+ * WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE or WORDPRESS_SITE_URL_UPDATE_PASSWORD
+ * supplies one strong credential.
  *
  * @package docker-sqlite-wordpress
  */
@@ -444,7 +444,6 @@ function sqlite_wordpress_site_url_tool_disable_runtime_environment() {
 	$_SERVER['WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED'] = 'false';
 
 	$credential_names = array(
-		'WORDPRESS_SITE_URL_UPDATE_TOKEN',
 		'WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE',
 		'WORDPRESS_SITE_URL_UPDATE_PASSWORD',
 		'SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED',
@@ -512,56 +511,53 @@ function sqlite_wordpress_site_url_tool_cancel_operation_safely( $operation_id )
 /**
  * Reads and validates the configured recovery credential.
  *
- * The *_FILE variant follows the Docker secrets convention and is preferred
- * because direct token/password environment variables are visible through
- * container inspection. Credential sources are mutually exclusive.
+ * TOKEN_FILE follows the Docker secrets convention and is preferred because a
+ * direct password environment variable is visible through container
+ * inspection. The two supported credential sources are mutually exclusive.
  *
  * @return string|null Configured credential, or null when none is configured.
  * @throws RuntimeException When the credential configuration is invalid.
  */
 function sqlite_wordpress_site_url_tool_configured_credential() {
-	$direct_token = getenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN' );
 	$token_file   = getenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE' );
 	$password     = getenv( 'WORDPRESS_SITE_URL_UPDATE_PASSWORD' );
 	$resolved     = getenv( 'SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED' );
-	$direct_set   = false !== $direct_token && '' !== trim( $direct_token );
 	$file_set     = false !== $token_file && '' !== trim( $token_file );
 	$password_set = false !== $password && '' !== trim( $password );
 	$resolved_set = false !== $resolved && '' !== trim( $resolved );
 
-	$source_count = ( $direct_set ? 1 : 0 ) + ( $file_set ? 1 : 0 ) + ( $password_set ? 1 : 0 );
-	if ( $source_count > 1 ) {
+	if ( $file_set && $password_set ) {
 		throw new RuntimeException( 'Set only one site URL update credential source.' );
 	}
-	if ( $resolved_set && ( $direct_set || $password_set ) ) {
-		throw new RuntimeException( 'The resolved token and direct site URL update credentials must not both be set.' );
+	if ( $resolved_set && ! $file_set ) {
+		throw new RuntimeException( 'The internally resolved token requires a configured token file.' );
 	}
 
-	if ( 0 === $source_count && ! $resolved_set ) {
+	if ( ! $file_set && ! $password_set ) {
 		return null;
 	}
 
 	$minimum_length  = 32;
 	$credential_name = 'token';
 	if ( $resolved_set ) {
-		$direct_token = $resolved;
+		$credential = $resolved;
 	} elseif ( $file_set ) {
 		$token_file = trim( $token_file );
 		if ( ! is_file( $token_file ) || ! is_readable( $token_file ) ) {
 			throw new RuntimeException( 'The configured site URL update token file is not readable.' );
 		}
 
-		$direct_token = file_get_contents( $token_file );
-		if ( false === $direct_token ) {
+		$credential = file_get_contents( $token_file );
+		if ( false === $credential ) {
 			throw new RuntimeException( 'The configured site URL update token file could not be read.' );
 		}
-	} elseif ( $password_set ) {
-		$direct_token    = $password;
+	} else {
+		$credential      = $password;
 		$minimum_length  = 24;
 		$credential_name = 'password';
 	}
 
-	$credential = trim( (string) $direct_token );
+	$credential = trim( (string) $credential );
 	if ( strlen( $credential ) < $minimum_length || strlen( $credential ) > 1024 ) {
 		throw new RuntimeException( sprintf( 'The site URL update %s must contain between %d and 1024 characters.', $credential_name, $minimum_length ) );
 	}

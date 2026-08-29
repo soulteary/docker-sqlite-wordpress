@@ -64,18 +64,12 @@ putenv( 'WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true' );
 site_url_tool_assert_same( true, sqlite_wordpress_site_url_tool_is_enabled(), 'exact lowercase true enables the tool' );
 site_url_tool_assert_same( null, sqlite_wordpress_site_url_tool_configured_credential(), 'enabled tool still requires a credential' );
 
-putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN=too-short' );
-site_url_tool_assert_throws(
-	function () {
-		sqlite_wordpress_site_url_tool_configured_credential();
-	},
-	RuntimeException::class,
-	'weak direct token is rejected'
-);
-
-$strong_token = str_repeat( 'a', 64 );
-putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN=' . $strong_token );
-site_url_tool_assert_same( $strong_token, sqlite_wordpress_site_url_tool_configured_credential(), 'strong direct token is accepted' );
+putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN=' . str_repeat( 'a', 64 ) );
+site_url_tool_assert_same( null, sqlite_wordpress_site_url_tool_configured_credential(), 'removed direct token variable is ignored' );
+putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN' );
+putenv( 'PASSWORD=' . str_repeat( 'g', 64 ) );
+site_url_tool_assert_same( null, sqlite_wordpress_site_url_tool_configured_credential(), 'generic password variable is ignored' );
+putenv( 'PASSWORD' );
 
 $token_file = tempnam( sys_get_temp_dir(), 'site-url-token-' );
 if ( false === $token_file ) {
@@ -83,23 +77,22 @@ if ( false === $token_file ) {
 	exit( 1 );
 }
 file_put_contents( $token_file, str_repeat( 'b', 64 ) . "\n" );
-putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN' );
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE=' . $token_file );
 site_url_tool_assert_same( str_repeat( 'b', 64 ), sqlite_wordpress_site_url_tool_configured_credential(), 'Docker secret token is accepted' );
 
-putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN=' . $strong_token );
+putenv( 'SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED=' . str_repeat( 'c', 64 ) );
+site_url_tool_assert_same( str_repeat( 'c', 64 ), sqlite_wordpress_site_url_tool_configured_credential(), 'entrypoint-resolved secret is accepted' );
+putenv( 'SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED' );
+putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE' );
+
+putenv( 'SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED=' . str_repeat( 'c', 64 ) );
 site_url_tool_assert_throws(
 	function () {
 		sqlite_wordpress_site_url_tool_configured_credential();
 	},
 	RuntimeException::class,
-	'ambiguous token sources are rejected'
+	'internal resolved token without a token file is rejected'
 );
-putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN' );
-putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE' );
-
-putenv( 'SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED=' . str_repeat( 'c', 64 ) );
-site_url_tool_assert_same( str_repeat( 'c', 64 ), sqlite_wordpress_site_url_tool_configured_credential(), 'entrypoint-resolved secret is accepted' );
 putenv( 'SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED' );
 
 putenv( 'WORDPRESS_SITE_URL_UPDATE_PASSWORD=' . str_repeat( 'p', 23 ) );
@@ -124,15 +117,6 @@ site_url_tool_assert_throws(
 );
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE' );
 
-putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN=' . $strong_token );
-site_url_tool_assert_throws(
-	function () {
-		sqlite_wordpress_site_url_tool_configured_credential();
-	},
-	RuntimeException::class,
-	'password and token cannot be configured together'
-);
-putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN' );
 putenv( 'WORDPRESS_SITE_URL_UPDATE_PASSWORD' );
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED' );
 unlink( $token_file );

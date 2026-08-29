@@ -20,8 +20,7 @@ DOCROOT="${WORDPRESS_DOCROOT}"
 # Resolve a Docker secret while the entrypoint still has permission to read a
 # root-owned file. The value is exported only to the container process tree; it
 # is not added to the image or Docker's configured environment metadata.
-if [ -z "${WORDPRESS_SITE_URL_UPDATE_TOKEN:-}" ] \
-	&& [ -n "${WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE:-}" ] \
+if [ -n "${WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE:-}" ] \
 	&& [ -f "${WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE}" ] \
 	&& [ -r "${WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE}" ]; then
 	resolved_site_url_update_token="$(< "${WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE}")"
