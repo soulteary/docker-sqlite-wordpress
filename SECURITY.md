@@ -72,6 +72,8 @@ While not vulnerabilities in this image, the following practices reduce your exp
 - Use strong administrator credentials and limit access to the WordPress dashboard.
 - Leave the site URL recovery endpoint disabled except during a recovery. Use
   the exact `WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true` switch together with
-  `WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE` and a randomly generated token. Send
-  the token only over TLS on untrusted networks, then remove both environment
-  settings immediately after the repair.
+  exactly one credential source. Prefer `WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE`
+  with a randomly generated token; direct `WORDPRESS_SITE_URL_UPDATE_TOKEN` and
+  `WORDPRESS_SITE_URL_UPDATE_PASSWORD` values are visible in container
+  environment metadata. Send credentials only over TLS on untrusted networks,
+  then remove the enable switch and credential immediately after the repair.

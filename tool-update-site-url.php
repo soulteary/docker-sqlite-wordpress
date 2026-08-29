@@ -1,13 +1,13 @@
 <?php
 /**
- * Emergency, token-protected updater for the WordPress site URLs.
+ * Emergency, credential-protected updater for the WordPress site URLs.
  *
  * This file intentionally lives in the document root instead of inside
  * WordPress. It remains reachable when an incorrect `home` or `siteurl` option
  * makes the normal site and wp-admin inaccessible. The endpoint is disabled
  * unless WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED is exactly `true` and
- * WORDPRESS_SITE_URL_UPDATE_TOKEN or WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE
- * supplies a strong token.
+ * WORDPRESS_SITE_URL_UPDATE_TOKEN, WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE, or
+ * WORDPRESS_SITE_URL_UPDATE_PASSWORD supplies one strong credential.
  *
  * @package docker-sqlite-wordpress
  */
@@ -53,33 +53,39 @@ function sqlite_wordpress_site_url_tool_is_enabled() {
 }
 
 /**
- * Reads and validates the configured recovery token.
+ * Reads and validates the configured recovery credential.
  *
  * The *_FILE variant follows the Docker secrets convention and is preferred
- * because environment variables are visible through container inspection.
+ * because direct token/password environment variables are visible through
+ * container inspection. Credential sources are mutually exclusive.
  *
- * @return string|null Configured token, or null when the tool is disabled.
- * @throws RuntimeException When the token configuration is invalid.
+ * @return string|null Configured credential, or null when none is configured.
+ * @throws RuntimeException When the credential configuration is invalid.
  */
-function sqlite_wordpress_site_url_tool_configured_token() {
+function sqlite_wordpress_site_url_tool_configured_credential() {
 	$direct_token = getenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN' );
 	$token_file   = getenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE' );
+	$password     = getenv( 'WORDPRESS_SITE_URL_UPDATE_PASSWORD' );
 	$resolved     = getenv( 'SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED' );
 	$direct_set   = false !== $direct_token && '' !== trim( $direct_token );
 	$file_set     = false !== $token_file && '' !== trim( $token_file );
+	$password_set = false !== $password && '' !== trim( $password );
 	$resolved_set = false !== $resolved && '' !== trim( $resolved );
 
-	if ( $direct_set && $file_set ) {
-		throw new RuntimeException( 'Set only one site URL update token source.' );
+	$source_count = ( $direct_set ? 1 : 0 ) + ( $file_set ? 1 : 0 ) + ( $password_set ? 1 : 0 );
+	if ( $source_count > 1 ) {
+		throw new RuntimeException( 'Set only one site URL update credential source.' );
 	}
-	if ( $resolved_set && $direct_set ) {
-		throw new RuntimeException( 'The resolved and direct site URL update tokens must not both be set.' );
+	if ( $resolved_set && ( $direct_set || $password_set ) ) {
+		throw new RuntimeException( 'The resolved token and direct site URL update credentials must not both be set.' );
 	}
 
-	if ( ! $direct_set && ! $file_set && ! $resolved_set ) {
+	if ( 0 === $source_count && ! $resolved_set ) {
 		return null;
 	}
 
+	$minimum_length  = 32;
+	$credential_name = 'token';
 	if ( $resolved_set ) {
 		$direct_token = $resolved;
 	} elseif ( $file_set ) {
@@ -92,17 +98,21 @@ function sqlite_wordpress_site_url_tool_configured_token() {
 		if ( false === $direct_token ) {
 			throw new RuntimeException( 'The configured site URL update token file could not be read.' );
 		}
+	} elseif ( $password_set ) {
+		$direct_token    = $password;
+		$minimum_length  = 16;
+		$credential_name = 'password';
 	}
 
-	$token = trim( (string) $direct_token );
-	if ( strlen( $token ) < 32 || strlen( $token ) > 1024 ) {
-		throw new RuntimeException( 'The site URL update token must contain between 32 and 1024 characters.' );
+	$credential = trim( (string) $direct_token );
+	if ( strlen( $credential ) < $minimum_length || strlen( $credential ) > 1024 ) {
+		throw new RuntimeException( sprintf( 'The site URL update %s must contain between %d and 1024 characters.', $credential_name, $minimum_length ) );
 	}
-	if ( preg_match( '/[\x00-\x1F\x7F]/', $token ) ) {
-		throw new RuntimeException( 'The site URL update token must not contain control characters.' );
+	if ( preg_match( '/[\x00-\x1F\x7F]/', $credential ) ) {
+		throw new RuntimeException( 'The site URL update credential must not contain control characters.' );
 	}
 
-	return $token;
+	return $credential;
 }
 
 /**
@@ -217,9 +227,9 @@ function sqlite_wordpress_site_url_tool_render( $title, $message, $status = 'inf
 			<div class="notice <?php echo sqlite_wordpress_site_url_tool_escape( $status_class ); ?>"><?php echo sqlite_wordpress_site_url_tool_escape( $message ); ?></div>
 			<?php if ( $show_form ) : ?>
 				<form method="post" autocomplete="off">
-					<label for="recovery-token">Recovery Token</label>
-					<input id="recovery-token" name="recovery_token" type="password" minlength="32" maxlength="1024" required autocomplete="off">
-					<small>The token is sent only in the POST body; do not put it in the URL.</small>
+					<label for="recovery-token">Recovery Token or Password</label>
+					<input id="recovery-token" name="recovery_token" type="password" minlength="16" maxlength="1024" required autocomplete="off">
+					<small>The credential is sent only in the POST body; do not put it in the URL.</small>
 
 					<label for="wordpress-url">WordPress Address (URL)</label>
 					<input id="wordpress-url" name="wordpress_url" type="url" maxlength="2048" required placeholder="https://example.com" value="<?php echo sqlite_wordpress_site_url_tool_escape( $wordpress_url ); ?>">
@@ -234,7 +244,7 @@ function sqlite_wordpress_site_url_tool_render( $title, $message, $status = 'inf
 			<?php elseif ( 'success' === $status_class ) : ?>
 				<p><strong>WordPress Address:</strong> <code><?php echo sqlite_wordpress_site_url_tool_escape( $wordpress_url ); ?></code></p>
 				<p><strong>Site Address:</strong> <code><?php echo sqlite_wordpress_site_url_tool_escape( $site_url ); ?></code></p>
-				<p>Disable the recovery tool now by removing its enable switch and token configuration, then restart the container.</p>
+				<p>Disable the recovery tool now by removing its enable switch and credential configuration, then restart the container.</p>
 			<?php endif; ?>
 		</section>
 	</main>
@@ -318,13 +328,13 @@ function sqlite_wordpress_site_url_tool_main() {
 	}
 
 	try {
-		$configured_token = sqlite_wordpress_site_url_tool_configured_token();
+		$configured_credential = sqlite_wordpress_site_url_tool_configured_credential();
 	} catch ( RuntimeException $error ) {
 		error_log( 'site URL recovery configuration error: ' . $error->getMessage() );
 		http_response_code( 503 );
 		sqlite_wordpress_site_url_tool_render(
 			'Site URL Recovery Unavailable',
-			'The recovery token configuration is invalid. Check the container logs.',
+			'The recovery credential configuration is invalid. Check the container logs.',
 			'error',
 			'',
 			'',
@@ -333,7 +343,7 @@ function sqlite_wordpress_site_url_tool_main() {
 		return;
 	}
 
-	if ( null === $configured_token ) {
+	if ( null === $configured_credential ) {
 		http_response_code( 404 );
 		echo 'Not Found';
 		return;
@@ -343,7 +353,7 @@ function sqlite_wordpress_site_url_tool_main() {
 	if ( 'GET' === $method ) {
 		sqlite_wordpress_site_url_tool_render(
 			'WordPress Site URL Recovery',
-			'Enter the configured recovery token and both new addresses. The update is committed as one SQLite transaction.'
+			'Enter the configured recovery token or password and both new addresses. The update is committed as one SQLite transaction.'
 		);
 		return;
 	}
@@ -355,12 +365,12 @@ function sqlite_wordpress_site_url_tool_main() {
 		return;
 	}
 
-	$provided_token = isset( $_POST['recovery_token'] ) && is_string( $_POST['recovery_token'] )
+	$provided_credential = isset( $_POST['recovery_token'] ) && is_string( $_POST['recovery_token'] )
 		? $_POST['recovery_token']
 		: '';
-	if ( strlen( $provided_token ) > 1024 || ! hash_equals( $configured_token, $provided_token ) ) {
+	if ( strlen( $provided_credential ) > 1024 || ! hash_equals( $configured_credential, $provided_credential ) ) {
 		http_response_code( 403 );
-		sqlite_wordpress_site_url_tool_render( 'Access Denied', 'The recovery token is invalid.', 'error' );
+		sqlite_wordpress_site_url_tool_render( 'Access Denied', 'The recovery credential is invalid.', 'error' );
 		return;
 	}
 
