@@ -10,6 +10,7 @@ Before contributing, please read this guide along with the [Code of Conduct](./C
 - [Before You Start](#before-you-start)
 - [Local Development Environment](#local-development-environment)
 - [Building and Verifying the Image](#building-and-verifying-the-image)
+  - [Repository Tests](#repository-tests)
 - [Reporting Issues](#reporting-issues)
 - [Submitting a Pull Request](#submitting-a-pull-request)
 - [Code Style Conventions](#code-style-conventions)
@@ -68,9 +69,45 @@ This project supports `linux/amd64`, `linux/arm64`, `linux/arm/v7`, `linux/arm/v
 docker buildx build --platform linux/amd64,linux/arm64 -t soulteary/sqlite-wordpress:dev .
 ```
 
+### Repository Tests
+
+Run the complete fast test set before opening a pull request:
+
+```bash
+bash tests/test-entrypoint-reconcile.sh
+bash tests/test-validate-release.sh
+php tests/test-sqlite-select-id-key-fix.php
+php tests/test-tool-update-site-url.php
+./scripts/validate-release.sh 7.1.0
+```
+
+CI additionally lints every PHP and shell file, runs ShellCheck and actionlint,
+and builds the amd64 image whenever packaged runtime files change. Changes to
+`tool-update-site-url.php`, its entrypoint state handling, or its documentation
+must preserve these security properties:
+
+- the endpoint is a 404 unless the exact enable switch and one valid credential
+  source are configured;
+- the fifth invalid credential in 15 minutes starts a 15-minute global lockout;
+- only one authenticated operation can run, and a write attempt consumes the
+  authorization before updating SQLite;
+- the persistent used state blocks new PHP workers and container restarts;
+- starting once with the enable value absent or not exactly `true` clears the
+  used state without enabling the endpoint.
+
+After building `soulteary/sqlite-wordpress:dev`, run the exact built-image
+recovery smoke test used by CI:
+
+```bash
+docker run --rm \
+  --volume "${PWD}/tests/image-smoke-site-url.php:/tmp/image-smoke-site-url.php:ro" \
+  soulteary/sqlite-wordpress:dev php /tmp/image-smoke-site-url.php
+```
+
 ### Verifying Key Functionality
 
-After modifying the `Dockerfile` or the plugin, please confirm the following inside the container:
+After modifying the `Dockerfile`, integration, or recovery tool, please confirm
+the following inside the container:
 
 - Whether the native extension loads correctly per platform (`amd64` / `arm64` should load it; 32-bit ARM should fall back):
 
@@ -85,6 +122,9 @@ docker exec -it <container> ls -l /var/www/html/wp-content/mu-plugins/
 ```
 
 - Whether the SQLite database integration plugin completes installation and can create, read, update, and delete posts normally.
+- Whether `/tool-update-site-url.php` is a 404 by default, accepts each
+  documented credential mode when enabled, updates both options atomically, and
+  becomes a 404 again immediately after one authenticated write attempt.
 
 ## Reporting Issues
 

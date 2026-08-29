@@ -21,6 +21,8 @@ printf "#!/usr/bin/env bash\ntest \"\${SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RE
 chmod +x "${stub_bin}/assert-site-url-token"
 printf 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n' > "${fixture_root}/site-url-token"
 chmod 600 "${fixture_root}/site-url-token"
+recovery_state_file="${dst_content}/database/.ht.site-url-update-tool-state"
+printf 'used recovery state\n' > "${recovery_state_file}"
 
 printf 'new drop-in\n' > "${src_content}/db.php"
 printf 'new recovery tool\n' > "${prepare_dir}/tool-update-site-url.php"
@@ -76,5 +78,19 @@ test ! -L "${dst_content}/mu-plugins/sqlite-database-integration-loader.php"
 grep -Fxq 'outside loader must remain unchanged' "${fixture_root}/outside-loader"
 
 test -f "${dst_content}/database/.ht.sqlite"
+test ! -e "${recovery_state_file}"
 test ! -e "${dst_content}/mu-plugins/.sqlite-database-integration.previous"
 test ! -e "${dst_content}/mu-plugins/.sqlite-database-integration.new.$$"
+
+# An exact enabled start preserves the one-shot latch, so restarting the same
+# recovery configuration cannot reopen an authorization that was already used.
+printf 'used recovery state\n' > "${recovery_state_file}"
+PATH="${stub_bin}:${PATH}" \
+	WORDPRESS_PREPARE_DIR="${prepare_dir}" \
+	WORDPRESS_DOCROOT="${docroot}" \
+	WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true \
+	WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE="${fixture_root}/site-url-token" \
+	APACHE_RUN_USER="$(id -u)" \
+	APACHE_RUN_GROUP="$(id -g)" \
+	bash "${repo_root}/docker-entrypoint-sqlite.sh" assert-site-url-token
+grep -Fxq 'used recovery state' "${recovery_state_file}"

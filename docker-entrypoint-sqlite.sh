@@ -126,6 +126,20 @@ if [ -d "$src_content" ] && [ -d "$DOCROOT" ]; then
 	mkdir -p "$dst_content/database"
 	[ -e "$dst_content/database/.ht.sqlite" ] || : > "$dst_content/database/.ht.sqlite"
 
+	# A successful recovery request creates a persistent one-shot latch beside the
+	# SQLite database. Keep it while the exact enable switch remains active so a
+	# container restart cannot reopen the endpoint. A deliberately disabled start
+	# clears the latch and rearms a future enable cycle.
+	recovery_state_file="$dst_content/database/.ht.site-url-update-tool-state"
+	if [ "${WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED:-}" != 'true' ] \
+		&& { [ -e "$recovery_state_file" ] || [ -L "$recovery_state_file" ]; }; then
+		if [ -d "$recovery_state_file" ] && [ ! -L "$recovery_state_file" ]; then
+			echo >&2 "sqlite: recovery state path must not be a directory: $recovery_state_file"
+			exit 1
+		fi
+		rm -f -- "$recovery_state_file"
+	fi
+
 	# Best-effort ownership/permissions so www-data can create/write the DB.
 	if [ "$(id -u)" = '0' ]; then
 		user="${APACHE_RUN_USER:-www-data}"

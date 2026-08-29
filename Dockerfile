@@ -111,7 +111,7 @@ COPY sqlite-database-integration-loader.php ${WORDPRESS_PREPARE_DIR}/wp-content/
 
 # Disabled-by-default emergency endpoint for repairing the database-backed
 # WordPress Address (`siteurl`) and Site Address (`home`) after a domain change.
-# It returns 404 unless explicitly enabled and a strong token is supplied.
+# It returns 404 unless explicitly enabled with one strong credential.
 COPY tool-update-site-url.php ${WORDPRESS_PREPARE_DIR}/tool-update-site-url.php
 
 # Self-healing entrypoint: the stock WordPress entrypoint only seeds a mounted

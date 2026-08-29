@@ -4,14 +4,22 @@ Release tags follow the bundled WordPress version, for example `7.1.0`. A tag pu
 
 ## Prepare
 
-1. Update both WordPress `FROM` instructions, the SQLite integration version, README examples, Docker Compose, and `CHANGELOG.md` in a release pull request.
+1. Update both WordPress `FROM` instructions, the SQLite integration version,
+   README examples, Docker Compose, and `CHANGELOG.md` in a release pull request.
+   Every feature-specific image tag in the README must name a published artifact
+   that actually contains that feature; remove any temporary "build from main"
+   availability notice only when the release image has been verified.
 2. Run the local release consistency check:
 
    ```bash
    ./scripts/validate-release.sh 7.1.0
    ```
 
-3. Complete the runtime checks described in the pull request, including the native parser and pure-PHP fallback paths.
+3. Complete the runtime checks described in the pull request, including the
+   native parser and pure-PHP fallback paths. Run
+   `tests/image-smoke-site-url.php` against the built image and verify the
+   password throttle, atomic two-option update, persistent one-shot lock, and
+   default 404 behavior.
 4. Prepare the GitHub Release notes from the matching `CHANGELOG.md` section. Include compatibility and migration notes, not only the generated pull-request list.
 5. Merge the release pull request into `main` before creating the tag.
 
@@ -44,7 +52,12 @@ The manual `Release` entry is only for an unpublished tag selected as the workfl
    docker buildx imagetools inspect ghcr.io/soulteary/sqlite-wordpress:7.1.0
    ```
 
-2. Pull the version tag from each registry and run the WordPress installation and SQLite diagnostics smoke tests.
+2. Pull the version tag from each registry and run the WordPress installation,
+   SQLite diagnostics, and site URL recovery smoke tests. Exercise both
+   TOKEN_FILE and PASSWORD configuration, confirm the fifth invalid credential
+   returns 429, confirm a successful write is followed by 404, and perform a
+   disabled start before checking that a new credential can deliberately rearm
+   the tool.
 3. Create the GitHub Release from the existing matching tag and copy the full `CHANGELOG.md` entry, including compatibility notes, into its notes. Keep it as a draft until image verification is complete.
 
 Do not force-push or retarget a published release tag. If published contents must change, prepare a new patch release. If a workflow fails, rerun only the failed jobs so successful preflight and digest artifacts remain associated with the same run.

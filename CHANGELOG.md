@@ -10,6 +10,19 @@
   updates the WordPress `siteurl` and `home` options after a domain, scheme,
   port, or path change.
 
+### Security
+
+- Added a persistent global authentication throttle: five failed recovery
+  credentials in 15 minutes lock the endpoint for 15 minutes.
+- Made each enabled recovery authorization one-shot. It is consumed before the
+  SQLite write, disables the current PHP worker, and remains locked for every
+  worker and container restart until an explicit disabled start rearms it.
+- Increased the direct recovery password minimum from 16 to 24 characters and
+  documented generated credentials, private-network exposure, TLS, IP
+  allowlists, and reverse-proxy rate limiting.
+- Ignored the documented local `.env` file and `secrets/` directory so recovery
+  credentials are not accidentally committed.
+
 ## [7.1.0] - 2026-08-29
 
 ### Changed
