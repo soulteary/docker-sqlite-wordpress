@@ -53,6 +53,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Verify pinned WordPress base image
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          ./scripts/validate-release.sh "${RELEASE_VERSION}" --verify-upstream
+
       - name: Ensure version tags do not already exist
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
