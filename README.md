@@ -11,7 +11,7 @@ WordPress with SQLite, ready to use out of the box.
 
 ## Native MySQL Parser Extension
 
-The image bundles WordPress `7.1.0` on PHP 8.5/Apache and [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration) `v3.0.0` together with its optional native Rust extension `wp_mysql_parser`, which is compiled during the Docker build and enabled by default. The SQLite driver automatically detects the extension and switches to the native fast path (roughly 4.8x faster lexer and 15.5x faster parser per upstream benchmarks).
+The image bundles WordPress `7.1.0` on PHP 8.5/Apache and [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration) `v3.0.0` together with its optional native Rust extension `wp_mysql_parser`. The extension is compiled and enabled on `amd64` and `arm64`; published 32-bit ARM variants use the plugin's pure-PHP fallback. The SQLite driver detects the available implementation automatically (the upstream project reports roughly 4.8x faster lexing and 15.5x faster parsing for the native path).
 
 Verify it is loaded inside the container:
 
@@ -66,16 +66,14 @@ docker pull ghcr.io/soulteary/sqlite-wordpress:7.1.0
 Use the following command to quickly launch the wordpress with port `8080`:
 
 ```bash
-docker run --rm -it -p 8080:80 -v `pwd`/wordpress:/var/www/html soulteary/sqlite-wordpress
+docker run --rm -it -p 8080:80 -v "$(pwd)/wordpress:/var/www/html" soulteary/sqlite-wordpress
 # or use GHCR
-docker run --rm -it -p 8080:80 -v `pwd`/wordpress:/var/www/html ghcr.io/soulteary/sqlite-wordpress:latest
+docker run --rm -it -p 8080:80 -v "$(pwd)/wordpress:/var/www/html" ghcr.io/soulteary/sqlite-wordpress:latest
 ```
 
 You can also use docker compose to start wordpress:
 
 ```yaml
-version: '3'
-
 services:
 
   wordpress:

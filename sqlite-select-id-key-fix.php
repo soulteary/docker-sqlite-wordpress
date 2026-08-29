@@ -73,8 +73,9 @@ function sqlite_select_id_key_fix_register_admin_page() {
 /**
  * Runs the diagnostic probe against the live database.
  *
- * Mirrors the CLI check: a single-table, un-aliased "SELECT P.id" fetched as
- * both ARRAY_A and OBJECT. When the plugin is effective the written casing
+ * Uses the current administrator row so the probe always has a result: a
+ * single-table, un-aliased "SELECT U.id" fetched as both ARRAY_A and OBJECT.
+ * When the plugin is effective the written casing
  * "id" survives; without it SQLite would echo back the declared column "ID".
  *
  * @return array{
@@ -89,7 +90,10 @@ function sqlite_select_id_key_fix_register_admin_page() {
 function sqlite_select_id_key_fix_run_probe() {
 	global $wpdb;
 
-	$sql          = 'SELECT P.id FROM ' . $wpdb->posts . ' AS P ORDER BY P.ID LIMIT 1';
+	$sql          = $wpdb->prepare(
+		'SELECT U.id FROM ' . $wpdb->users . ' AS U WHERE U.ID = %d LIMIT 1',
+		get_current_user_id()
+	);
 	$filtered_sql = (string) apply_filters( 'query', $sql );
 
 	$array_row  = $wpdb->get_row( $sql, ARRAY_A );
@@ -98,17 +102,15 @@ function sqlite_select_id_key_fix_run_probe() {
 	$array_ok  = is_array( $array_row ) && array_key_exists( 'id', $array_row );
 	$object_ok = is_object( $object_row ) && property_exists( $object_row, 'id' );
 
-	// The 3.0.0 path proves itself through the rewritten SQL alias; the older
-	// result-set path proves itself through the ARRAY_A / OBJECT keys.
-	$has_alias = (bool) preg_match( '/P\.id\s+AS\s+"id"/i', $filtered_sql );
+	$has_alias = (bool) preg_match( '/U\.id\s+AS\s+"id"/i', $filtered_sql );
 
 	return array(
 		'filtered_sql' => $filtered_sql,
 		'has_alias'    => $has_alias,
 		'array_ok'     => $array_ok,
 		'object_ok'    => $object_ok,
-		'effective'    => ( $has_alias || ( $array_ok && $object_ok ) ),
-		'table'        => $wpdb->posts,
+		'effective'    => ( $array_ok && $object_ok ),
+		'table'        => $wpdb->users,
 	);
 }
 
@@ -144,12 +146,12 @@ function sqlite_select_id_key_fix_render_admin_page() {
 			. '</p></div>';
 	}
 
-	echo '<p>' . esc_html__( 'This page runs the same probe used from the command line: an un-aliased single-table "SELECT P.id" fetched as ARRAY_A and OBJECT.', 'sqlite-select-id-key-fix' ) . '</p>';
+	echo '<p>' . esc_html__( 'This page runs an un-aliased single-table "SELECT U.id" for the current administrator, fetched as ARRAY_A and OBJECT.', 'sqlite-select-id-key-fix' ) . '</p>';
 
 	echo '<h2>' . esc_html__( 'Probe', 'sqlite-select-id-key-fix' ) . '</h2>';
 	echo '<p><strong>' . esc_html__( 'Original SQL', 'sqlite-select-id-key-fix' ) . ':</strong></p>';
 	echo '<pre style="background:#f6f7f7;padding:10px;overflow:auto;">'
-		. esc_html( 'SELECT P.id FROM ' . $probe['table'] . ' AS P ORDER BY P.ID LIMIT 1' )
+		. esc_html( 'SELECT U.id FROM ' . $probe['table'] . ' AS U WHERE U.ID = ' . get_current_user_id() . ' LIMIT 1' )
 		. '</pre>';
 	echo '<p><strong>' . esc_html__( 'Filtered SQL', 'sqlite-select-id-key-fix' ) . ':</strong></p>';
 	echo '<pre style="background:#f6f7f7;padding:10px;overflow:auto;">' . esc_html( $probe['filtered_sql'] ) . '</pre>';
@@ -157,7 +159,7 @@ function sqlite_select_id_key_fix_render_admin_page() {
 	echo '<table class="widefat striped" style="max-width:640px;">';
 	echo '<thead><tr><th>' . esc_html__( 'Check', 'sqlite-select-id-key-fix' ) . '</th><th>' . esc_html__( 'Result', 'sqlite-select-id-key-fix' ) . '</th></tr></thead>';
 	echo '<tbody>';
-	echo '<tr><td>' . esc_html__( 'Filtered SQL contains P.id AS "id"', 'sqlite-select-id-key-fix' ) . '</td><td>' . ( $probe['has_alias'] ? $yes : $no ) . '</td></tr>';
+	echo '<tr><td>' . esc_html__( 'Filtered SQL contains U.id AS "id"', 'sqlite-select-id-key-fix' ) . '</td><td>' . ( $probe['has_alias'] ? $yes : $no ) . '</td></tr>';
 	echo '<tr><td>' . esc_html__( 'ARRAY_A row has key "id"', 'sqlite-select-id-key-fix' ) . '</td><td>' . ( $probe['array_ok'] ? $yes : $no ) . '</td></tr>';
 	echo '<tr><td>' . esc_html__( 'OBJECT row has property "id"', 'sqlite-select-id-key-fix' ) . '</td><td>' . ( $probe['object_ok'] ? $yes : $no ) . '</td></tr>';
 	echo '</tbody></table>';

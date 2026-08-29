@@ -12,11 +12,12 @@ Release tags follow the bundled WordPress version, for example `7.1.0`. A tag pu
    ```
 
 3. Complete the runtime checks described in the pull request, including the native parser and pure-PHP fallback paths.
-4. Merge the release pull request into `main` before creating the tag.
+4. Prepare the GitHub Release notes from the matching `CHANGELOG.md` section. Include compatibility and migration notes, not only the generated pull-request list.
+5. Merge the release pull request into `main` before creating the tag.
 
 ## Publish
 
-Create one annotated tag from the verified `main` commit and push it without moving or reusing an existing release tag:
+Create one annotated tag from the verified `main` commit and push it without moving or reusing an existing release tag. Do not let the GitHub Release form create the tag: that produces a lightweight tag and makes the release visible before its images have passed verification.
 
 ```bash
 git switch main
@@ -42,6 +43,6 @@ The manual workflow entry is only for an unpublished tag selected as the workflo
    ```
 
 2. Pull the version tag from each registry and run the WordPress installation and SQLite diagnostics smoke tests.
-3. Create the GitHub Release from the matching tag and copy the `CHANGELOG.md` entry into its notes.
+3. Create the GitHub Release from the existing matching tag and copy the full `CHANGELOG.md` entry, including compatibility notes, into its notes. Keep it as a draft until image verification is complete.
 
 Do not force-push or retarget a published release tag. If published contents must change, prepare a new patch release. If a workflow fails, rerun only the failed jobs so successful preflight and digest artifacts remain associated with the same run.
