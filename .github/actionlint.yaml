@@ -1,0 +1,5 @@
+self-hosted-runner:
+  labels:
+    # GitHub-hosted public-preview ARM runner. Keep this until actionlint's
+    # built-in label list includes the runner.
+    - ubuntu-26.04-arm
