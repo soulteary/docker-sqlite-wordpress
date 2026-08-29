@@ -62,7 +62,8 @@ jobs:
               sqlite-database-integration-loader.php \
               sqlite-diagnostics.php \
               sqlite-select-id-key-fix.php \
-              tool-update-site-url.php; then
+              tool-update-site-url.php \
+              tests/image-smoke-site-url.php; then
             image_changed=false
           fi
           echo "image_changed=${image_changed}" >> "${GITHUB_OUTPUT}"
@@ -165,3 +166,6 @@ jobs:
             }
             $driver->rollBack();
           '
+          docker run --rm \
+            --volume "${PWD}/tests/image-smoke-site-url.php:/tmp/image-smoke-site-url.php:ro" \
+            sqlite-wordpress:test php /tmp/image-smoke-site-url.php

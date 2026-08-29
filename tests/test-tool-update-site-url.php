@@ -3,7 +3,15 @@
  * Regression tests for the standalone site URL recovery tool.
  */
 
+$site_url_tool_state_file = tempnam( sys_get_temp_dir(), 'site-url-state-' );
+if ( false === $site_url_tool_state_file ) {
+	fwrite( STDERR, "FAIL: could not create state fixture\n" );
+	exit( 1 );
+}
+unlink( $site_url_tool_state_file );
+
 define( 'SQLITE_WORDPRESS_SITE_URL_TOOL_TESTING', true );
+define( 'SQLITE_WORDPRESS_SITE_URL_TOOL_STATE_FILE', $site_url_tool_state_file );
 require dirname( __DIR__ ) . '/tool-update-site-url.php';
 
 /**
@@ -94,7 +102,7 @@ putenv( 'SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED=' . str_repeat( 'c', 64
 site_url_tool_assert_same( str_repeat( 'c', 64 ), sqlite_wordpress_site_url_tool_configured_credential(), 'entrypoint-resolved secret is accepted' );
 putenv( 'SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED' );
 
-putenv( 'WORDPRESS_SITE_URL_UPDATE_PASSWORD=too-short' );
+putenv( 'WORDPRESS_SITE_URL_UPDATE_PASSWORD=' . str_repeat( 'p', 23 ) );
 site_url_tool_assert_throws(
 	function () {
 		sqlite_wordpress_site_url_tool_configured_credential();
@@ -102,7 +110,7 @@ site_url_tool_assert_throws(
 	RuntimeException::class,
 	'weak password is rejected'
 );
-$strong_password = str_repeat( 'p', 16 );
+$strong_password = str_repeat( 'p', 24 );
 putenv( 'WORDPRESS_SITE_URL_UPDATE_PASSWORD=' . $strong_password );
 site_url_tool_assert_same( $strong_password, sqlite_wordpress_site_url_tool_configured_credential(), 'strong direct password is accepted' );
 
@@ -128,6 +136,103 @@ putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN' );
 putenv( 'WORDPRESS_SITE_URL_UPDATE_PASSWORD' );
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED' );
 unlink( $token_file );
+
+$state_time = 1000000;
+site_url_tool_assert_same(
+	array( 'status' => 'ready', 'retry_after' => 0 ),
+	sqlite_wordpress_site_url_tool_availability( $state_time ),
+	'new authorization state is ready'
+);
+for ( $attempt = 1; $attempt <= 4; ++$attempt ) {
+	$authorization = sqlite_wordpress_site_url_tool_begin_operation( $strong_password, 'incorrect-password', $state_time + $attempt );
+	site_url_tool_assert_same( 'denied', $authorization['status'], 'failed credential is denied before threshold ' . $attempt );
+}
+$authorization = sqlite_wordpress_site_url_tool_begin_operation( $strong_password, 'incorrect-password', $state_time + 5 );
+site_url_tool_assert_same( 'locked', $authorization['status'], 'fifth failed credential locks recovery' );
+site_url_tool_assert_same( 900, $authorization['retry_after'], 'lockout lasts 15 minutes' );
+site_url_tool_assert_same(
+	array( 'status' => 'locked', 'retry_after' => 800 ),
+	sqlite_wordpress_site_url_tool_availability( $state_time + 105 ),
+	'lockout is shared by later requests'
+);
+$authorization = sqlite_wordpress_site_url_tool_begin_operation( $strong_password, $strong_password, $state_time + 105 );
+site_url_tool_assert_same( 'locked', $authorization['status'], 'correct credential cannot bypass active lockout' );
+site_url_tool_assert_same(
+	array( 'status' => 'ready', 'retry_after' => 0 ),
+	sqlite_wordpress_site_url_tool_availability( $state_time + 906 ),
+	'expired lockout resets automatically'
+);
+
+$authorization = sqlite_wordpress_site_url_tool_begin_operation( $strong_password, $strong_password, $state_time + 907 );
+site_url_tool_assert_same( 'accepted', $authorization['status'], 'correct credential reserves recovery operation' );
+$operation_id = $authorization['operation_id'];
+site_url_tool_assert_same( 32, strlen( $operation_id ), 'reservation uses a random 128-bit id' );
+site_url_tool_assert_same(
+	array( 'status' => 'busy', 'retry_after' => 300 ),
+	sqlite_wordpress_site_url_tool_availability( $state_time + 907 ),
+	'parallel recovery requests are blocked'
+);
+$parallel = sqlite_wordpress_site_url_tool_begin_operation( $strong_password, $strong_password, $state_time + 907 );
+site_url_tool_assert_same( 'busy', $parallel['status'], 'second correct request cannot reserve the same authorization' );
+site_url_tool_assert_same( false, sqlite_wordpress_site_url_tool_cancel_operation( str_repeat( '0', 32 ), $state_time + 908 ), 'wrong reservation cannot be cancelled' );
+site_url_tool_assert_same( true, sqlite_wordpress_site_url_tool_cancel_operation( $operation_id, $state_time + 908 ), 'validation failure releases reservation' );
+site_url_tool_assert_same(
+	array( 'status' => 'ready', 'retry_after' => 0 ),
+	sqlite_wordpress_site_url_tool_availability( $state_time + 908 ),
+	'released reservation can be retried'
+);
+
+$authorization = sqlite_wordpress_site_url_tool_begin_operation( $strong_password, $strong_password, $state_time + 909 );
+putenv( 'WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true' );
+putenv( 'WORDPRESS_SITE_URL_UPDATE_PASSWORD=' . $strong_password );
+sqlite_wordpress_site_url_tool_consume_operation( $authorization['operation_id'], $state_time + 909 );
+site_url_tool_assert_same( 'false', getenv( 'WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED' ), 'consumed authorization disables the current PHP worker' );
+site_url_tool_assert_same( false, getenv( 'WORDPRESS_SITE_URL_UPDATE_PASSWORD' ), 'consumed authorization removes the current worker credential' );
+site_url_tool_assert_same(
+	array( 'status' => 'used', 'retry_after' => 0 ),
+	sqlite_wordpress_site_url_tool_availability( $state_time + 910 ),
+	'consumed authorization stays locked for every worker'
+);
+$authorization = sqlite_wordpress_site_url_tool_begin_operation( $strong_password, $strong_password, $state_time + 910 );
+site_url_tool_assert_same( 'used', $authorization['status'], 'used authorization cannot be replayed' );
+site_url_tool_assert_same( 0600, fileperms( $site_url_tool_state_file ) & 0777, 'authorization state is owner-only' );
+site_url_tool_assert_throws(
+	function () {
+		sqlite_wordpress_site_url_tool_decode_state( '{"version":1}' );
+	},
+	RuntimeException::class,
+	'malformed authorization state fails closed'
+);
+file_put_contents( $site_url_tool_state_file, '' );
+site_url_tool_assert_throws(
+	function () use ( $state_time ) {
+		sqlite_wordpress_site_url_tool_availability( $state_time + 911 );
+	},
+	RuntimeException::class,
+	'unexpectedly empty authorization state fails closed'
+);
+unlink( $site_url_tool_state_file );
+site_url_tool_assert_throws(
+	function () use ( $state_time ) {
+		sqlite_wordpress_site_url_tool_availability( $state_time + 912 );
+	},
+	RuntimeException::class,
+	'missing authorization state with an existing lock fails closed'
+);
+$state_symlink_target = tempnam( sys_get_temp_dir(), 'site-url-state-target-' );
+if ( false === $state_symlink_target || ! symlink( $state_symlink_target, $site_url_tool_state_file ) ) {
+	fwrite( STDERR, "FAIL: could not create state symlink fixture\n" );
+	exit( 1 );
+}
+site_url_tool_assert_throws(
+	function () use ( $state_time ) {
+		sqlite_wordpress_site_url_tool_availability( $state_time + 913 );
+	},
+	RuntimeException::class,
+	'symbolic-link authorization state fails closed'
+);
+unlink( $site_url_tool_state_file );
+unlink( $state_symlink_target );
 
 $valid_urls = array(
 	'public URL'       => array( 'https://example.com/', 'https://example.com' ),
@@ -304,4 +409,11 @@ site_url_tool_assert_same(
 	'option caches are cleared after rollback'
 );
 
+if ( file_exists( $site_url_tool_state_file ) || is_link( $site_url_tool_state_file ) ) {
+	unlink( $site_url_tool_state_file );
+}
+$site_url_tool_lock_file = $site_url_tool_state_file . '.lock';
+if ( file_exists( $site_url_tool_lock_file ) || is_link( $site_url_tool_lock_file ) ) {
+	unlink( $site_url_tool_lock_file );
+}
 fwrite( STDOUT, "tool-update-site-url tests passed\n" );

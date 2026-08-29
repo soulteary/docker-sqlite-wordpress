@@ -3,8 +3,31 @@ services:
   wordpress:
     image: soulteary/sqlite-wordpress:7.1.0
     # or use: ghcr.io/soulteary/sqlite-wordpress:7.1.0
+    # The recovery tool was added after 7.1.0. Until the next release, run
+    # `docker build -t sqlite-wordpress:site-url-recovery .` and replace the
+    # image above with `sqlite-wordpress:site-url-recovery`.
     restart: always
     ports:
       - 8080:80
+    environment:
+      # Emergency site URL recovery stays disabled during normal operation.
+      # To use the short-lived PASSWORD mode, export both host variables and
+      # run `docker compose up -d --force-recreate`. Generate the password with:
+      # `export WORDPRESS_SITE_URL_UPDATE_PASSWORD="$(openssl rand -base64 24)"`
+      # `export WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true`
+      WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED: "${WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED:-false}"
+      WORDPRESS_SITE_URL_UPDATE_PASSWORD: "${WORDPRESS_SITE_URL_UPDATE_PASSWORD:-}"
+
+      # TOKEN_FILE is preferred for shared or internet-reachable hosts. Uncomment
+      # this line and the service/top-level secrets blocks below. Leave PASSWORD
+      # unset or empty: TOKEN_FILE, TOKEN, and PASSWORD are mutually exclusive.
+      # WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE: /run/secrets/site-url-update-token
+    # secrets:
+    #   - site-url-update-token
     volumes:
       - ./wordpress:/var/www/html
+
+# Preferred TOKEN_FILE definition:
+# secrets:
+#   site-url-update-token:
+#     file: ./secrets/site-url-update-token

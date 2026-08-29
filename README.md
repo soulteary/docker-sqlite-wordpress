@@ -94,6 +94,14 @@ Use the quick 1-minute initial installation, enjoy.
 
 ## Emergency Site URL Recovery Tool
 
+> **Availability:** this tool was added to `main` after the immutable `7.1.0`
+> release. The published `7.1.0` and current `latest` images do not contain it.
+> Until the next release, build the current repository and use a local image:
+>
+> ```bash
+> docker build -t sqlite-wordpress:site-url-recovery .
+> ```
+
 The image includes `/tool-update-site-url.php` for recovering a site after an
 incorrect domain, scheme, port, or subdirectory was saved in WordPress. The
 standalone page remains reachable even when the normal site or `wp-admin`
@@ -103,6 +111,8 @@ transaction:
 - **WordPress Address (URL)** → the `siteurl` option (where WordPress core files
   are located).
 - **Site Address (URL)** → the `home` option (the public visitor-facing URL).
+
+### Security model
 
 The endpoint is disabled by default and returns `404 Not Found` unless both of
 these independent conditions are met:
@@ -119,10 +129,31 @@ Choose exactly one of these credential sources:
 | --- | ---: | --- |
 | `WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE` | 32 characters | Preferred. Reads a Docker secret or mounted file. |
 | `WORDPRESS_SITE_URL_UPDATE_TOKEN` | 32 characters | Direct token; visible in container environment metadata. |
-| `WORDPRESS_SITE_URL_UPDATE_PASSWORD` | 16 characters | Direct password; visible in container environment metadata. |
+| `WORDPRESS_SITE_URL_UPDATE_PASSWORD` | 24 characters | Direct password; visible in container environment metadata. Use a generated value or long passphrase. |
 
-Do not configure more than one source at the same time. To use the preferred
-file-based token:
+The generic variable `PASSWORD` is intentionally ignored to avoid collisions
+with unrelated software. Do not configure more than one source at the same
+time.
+
+Authentication is globally throttled across all PHP workers. Five failed
+credentials within 15 minutes lock the endpoint for 15 minutes and return
+`429 Too Many Requests`. A correct credential reserves one operation for five
+minutes so concurrent requests cannot reuse it. Immediately before the SQLite
+write, that authorization is permanently consumed: the current PHP worker sets
+`WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=false`, removes its credential values,
+and writes a one-shot state file beside the SQLite database. Other workers and
+container restarts continue returning `404`, even though an application cannot
+rewrite Docker's configured environment.
+
+The global lock prevents distributed guessing without trusting forwarded IP
+headers, but an exposed attacker could deliberately trigger the temporary
+lockout. Keep the endpoint on a private network or IP allowlist and add reverse
+proxy rate limiting when it must be internet-reachable. Always use TLS outside
+the local machine.
+
+### Preferred TOKEN_FILE example
+
+Create a random token file:
 
 ```bash
 mkdir -p secrets
@@ -134,7 +165,8 @@ chmod 600 secrets/site-url-update-token
 services:
 
   wordpress:
-    image: soulteary/sqlite-wordpress:7.1.0
+    build: .
+    image: sqlite-wordpress:site-url-recovery
     ports:
       - 8080:80
     environment:
@@ -150,27 +182,100 @@ secrets:
     file: ./secrets/site-url-update-token
 ```
 
-Recreate the container, then open
-`http://localhost:8080/tool-update-site-url.php`. Enter the configured token or
-password and the two desired addresses. The credential is accepted only in the
-POST body; never append it to the URL. When the site works at its new address,
-remove both `WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED` and the selected credential
-configuration, then recreate the container so the endpoint returns 404 again.
+### PASSWORD Compose example
 
-For a short-lived local recovery, either pass a generated token directly as
-`WORDPRESS_SITE_URL_UPDATE_TOKEN`, or set a strong password through
-`WORDPRESS_SITE_URL_UPDATE_PASSWORD`. Set
-`WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true` at the same time. Direct values
-are visible through `docker inspect`, so prefer the file-based token for shared
-or long-running hosts. Use TLS whenever the endpoint is reachable across an
-untrusted network.
+`WORDPRESS_SITE_URL_UPDATE_PASSWORD` is intended only for short-lived local or
+otherwise network-restricted recovery. Generate and export a fresh value rather
+than committing it to Compose or `.env`:
+
+```bash
+export WORDPRESS_SITE_URL_UPDATE_PASSWORD="$(openssl rand -base64 24)"
+```
+
+```yaml
+services:
+
+  wordpress:
+    build: .
+    image: sqlite-wordpress:site-url-recovery
+    ports:
+      - 8080:80
+    environment:
+      WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED: "true"
+      WORDPRESS_SITE_URL_UPDATE_PASSWORD: "${WORDPRESS_SITE_URL_UPDATE_PASSWORD:?export a recovery password first}"
+    volumes:
+      - ./wordpress:/var/www/html
+```
+
+The repository's [`docker-compose.yml`](./docker-compose.yml) contains the same
+PASSWORD settings with safe disabled/empty defaults and commented TOKEN_FILE
+alternatives. Because direct passwords appear in `docker inspect`, prefer the
+TOKEN_FILE example for shared hosts.
+
+### Recovery workflow and automatic shutdown
+
+1. Back up `wp-content/database/`.
+2. Configure the exact enable value `true` and exactly one credential, then
+   recreate the container.
+3. Open `http://localhost:8080/tool-update-site-url.php`. Enter the credential
+   and both new addresses. The credential is accepted only in the POST body;
+   never append it to the URL.
+4. Verify both the public site and `wp-admin` at their new addresses. The first
+   authenticated write attempt consumes the authorization and automatically
+   hides the endpoint. This remains true even if the database update reports an
+   error, so inspect the container logs and current option values before doing
+   anything else.
+5. Remove `WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED` and the selected credential
+   from Compose, then recreate the container. This disabled start clears the
+   internal used-state file while keeping the endpoint disabled.
+
+To deliberately rearm the tool later, first start the container once with the
+enable setting removed or set to `false`. Then configure a new credential, set
+the exact value `true`, and recreate it again. Merely restarting with the same
+enabled configuration never clears a consumed authorization.
+
+The managed latch is
+`wp-content/database/.ht.site-url-update-tool-state`. Do not delete or edit it
+while the endpoint is enabled; the entrypoint removes it safely during the
+documented disabled start.
+
+### Accepted URL rules
+
+| Rule | Accepted examples / behavior |
+| --- | --- |
+| Absolute HTTP(S) URL | `https://example.com`, `http://localhost:8080` |
+| Optional port or subdirectory | `https://example.com:8443/wordpress` |
+| Local and private hosts | Localhost, private IPv4, and bracketed IPv6 addresses are accepted. |
+| Internationalized hostnames | Use their ASCII/Punycode form. |
+| Trailing slash | Removed before the option is stored. |
+| Rejected components | Embedded username/password, query string, fragment, whitespace, backslash, or `.` / `..` path segments. |
+
+Both fields are required even when their values are identical. Use different
+values only when WordPress core is installed in a subdirectory, for example
+`siteurl=https://example.com/wordpress` and `home=https://example.com`.
+
+### Troubleshooting
+
+Check detailed server-side errors with `docker compose logs wordpress`. The
+endpoint intentionally avoids returning sensitive configuration details.
+
+| HTTP status | Meaning | Action |
+| ---: | --- | --- |
+| `404` | Disabled, missing credential, or one-shot authorization already used. | Check the exact enable value and follow the deliberate rearm sequence if a previous attempt consumed it. |
+| `403` | Invalid credential before the failure threshold. | Check the selected TOKEN_FILE, TOKEN, or PASSWORD source; do not configure multiple sources. |
+| `405` | Unsupported request method. | Open with GET and submit the form with POST. |
+| `409` | Another authenticated request is active, Multisite is enabled, or `WP_HOME` / `WP_SITEURL` overrides the database. | Wait for the active request, or correct the unsupported WordPress configuration. |
+| `422` | A submitted URL failed validation. | Apply the accepted URL rules above and submit both fields again. |
+| `429` | Five failed credentials triggered the 15-minute global lockout. | Wait for `Retry-After`, inspect logs, and restrict network access before retrying. |
+| `500` | The atomic SQLite update failed after the one-shot authorization was consumed. | Inspect logs and both option values, then deliberately rearm only if another attempt is required. |
+| `503` | Invalid credential configuration, unreadable state/database directory, or missing WordPress runtime. | Check logs, file mounts, permissions, and mutually exclusive credential settings. |
 
 The tool intentionally refuses WordPress Multisite installations. It also
 refuses to write when `WP_HOME` or `WP_SITEURL` is defined in `wp-config.php`,
 because those constants override the database values; update or remove the
 constants instead.
 
-### Volume / upgrade note
+## Volume and Upgrade Notes
 
 Back up `wp-content/database/` before upgrading an existing site to the
 WordPress 7.1.0 / SQLite Database Integration 3.0.0 image. Version 3.0.0

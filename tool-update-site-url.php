@@ -53,6 +53,463 @@ function sqlite_wordpress_site_url_tool_is_enabled() {
 }
 
 /**
+ * Returns the persistent state file used for throttling and one-shot locking.
+ *
+ * The production path lives beside the SQLite database so every Apache worker
+ * and subsequent container start observes the same state. Tests may override
+ * it with a constant without exposing another runtime environment setting.
+ *
+ * @return string State file path.
+ */
+function sqlite_wordpress_site_url_tool_state_file() {
+	if ( defined( 'SQLITE_WORDPRESS_SITE_URL_TOOL_STATE_FILE' ) ) {
+		return (string) constant( 'SQLITE_WORDPRESS_SITE_URL_TOOL_STATE_FILE' );
+	}
+
+	return __DIR__ . '/wp-content/database/.ht.site-url-update-tool-state';
+}
+
+/**
+ * Returns a new recovery authorization state.
+ *
+ * @return array<string,mixed> Default state.
+ */
+function sqlite_wordpress_site_url_tool_default_state() {
+	return array(
+		'version'                => 1,
+		'failed_attempts'        => 0,
+		'failure_window_started' => 0,
+		'locked_until'           => 0,
+		'operation_id'           => '',
+		'operation_expires'      => 0,
+		'used'                   => false,
+		'used_at'                => 0,
+	);
+}
+
+/**
+ * Validates persisted state and fails closed if it was corrupted.
+ *
+ * @param string $raw Raw state file contents.
+ * @return array<string,mixed> Validated state.
+ * @throws RuntimeException When persisted state is malformed.
+ */
+function sqlite_wordpress_site_url_tool_decode_state( $raw ) {
+	if ( '' === $raw ) {
+		throw new RuntimeException( 'The site URL recovery state is unexpectedly empty.' );
+	}
+
+	$state = json_decode( $raw, true );
+	if ( ! is_array( $state ) || 1 !== ( isset( $state['version'] ) ? $state['version'] : null ) ) {
+		throw new RuntimeException( 'The site URL recovery state is invalid.' );
+	}
+
+	$integer_fields = array(
+		'failed_attempts',
+		'failure_window_started',
+		'locked_until',
+		'operation_expires',
+		'used_at',
+	);
+	foreach ( $integer_fields as $field ) {
+		if ( ! isset( $state[ $field ] ) || ! is_int( $state[ $field ] ) || $state[ $field ] < 0 ) {
+			throw new RuntimeException( 'The site URL recovery state is invalid.' );
+		}
+	}
+
+	if ( ! array_key_exists( 'operation_id', $state ) || ! is_string( $state['operation_id'] ) || ( '' !== $state['operation_id'] && ! preg_match( '/^[a-f0-9]{32}$/D', $state['operation_id'] ) ) ) {
+		throw new RuntimeException( 'The site URL recovery state is invalid.' );
+	}
+	if ( ! array_key_exists( 'used', $state ) || ! is_bool( $state['used'] ) ) {
+		throw new RuntimeException( 'The site URL recovery state is invalid.' );
+	}
+
+	return $state;
+}
+
+/**
+ * Expires old failure windows, lockouts, and abandoned operations.
+ *
+ * @param array<string,mixed> $state Current state.
+ * @param int                 $now   Current Unix timestamp.
+ * @return array<string,mixed> Normalized state.
+ */
+function sqlite_wordpress_site_url_tool_normalize_state( $state, $now ) {
+	$window_seconds = 15 * 60;
+
+	if ( $state['locked_until'] > 0 && $state['locked_until'] <= $now ) {
+		$state['failed_attempts']        = 0;
+		$state['failure_window_started'] = 0;
+		$state['locked_until']           = 0;
+	}
+	if ( $state['failure_window_started'] > 0 && $state['failure_window_started'] + $window_seconds <= $now ) {
+		$state['failed_attempts']        = 0;
+		$state['failure_window_started'] = 0;
+	}
+	if ( $state['operation_expires'] > 0 && $state['operation_expires'] <= $now ) {
+		$state['operation_id']      = '';
+		$state['operation_expires'] = 0;
+	}
+	if ( $state['used'] ) {
+		$state['operation_id']      = '';
+		$state['operation_expires'] = 0;
+	}
+
+	return $state;
+}
+
+/**
+ * Atomically persists state through a same-directory temporary file.
+ *
+ * The temporary file is synced before rename, then the containing directory is
+ * synced so a successful call survives process or host interruption. The old
+ * complete state remains visible until the atomic rename.
+ *
+ * @param string $state_file  Destination state file.
+ * @param string $state_dir   Resolved state directory.
+ * @param string $payload     Encoded state.
+ * @return void
+ * @throws RuntimeException When durable persistence fails.
+ */
+function sqlite_wordpress_site_url_tool_write_state( $state_file, $state_dir, $payload ) {
+	$temp_file = tempnam( $state_dir, '.ht.site-url-state.tmp-' );
+	if ( false === $temp_file ) {
+		throw new RuntimeException( 'A temporary site URL recovery state could not be created.' );
+	}
+
+	$temp_handle = null;
+	$renamed     = false;
+	try {
+		$resolved_temp = realpath( $temp_file );
+		if ( false === $resolved_temp || dirname( $resolved_temp ) !== $state_dir || is_link( $temp_file ) ) {
+			throw new RuntimeException( 'The temporary site URL recovery state path is unsafe.' );
+		}
+
+		$temp_handle = fopen( $temp_file, 'wb' );
+		if ( false === $temp_handle || ! chmod( $temp_file, 0600 ) ) {
+			throw new RuntimeException( 'The temporary site URL recovery state could not be opened safely.' );
+		}
+
+		$offset = 0;
+		$length = strlen( $payload );
+		while ( $offset < $length ) {
+			$written = fwrite( $temp_handle, substr( $payload, $offset ) );
+			if ( false === $written || 0 === $written ) {
+				throw new RuntimeException( 'The site URL recovery state could not be saved.' );
+			}
+			$offset += $written;
+		}
+		if ( ! fflush( $temp_handle ) || ! fsync( $temp_handle ) ) {
+			throw new RuntimeException( 'The site URL recovery state could not be synchronized.' );
+		}
+		fclose( $temp_handle );
+		$temp_handle = null;
+
+		if ( ! rename( $temp_file, $state_file ) ) {
+			throw new RuntimeException( 'The site URL recovery state could not be replaced atomically.' );
+		}
+		$renamed = true;
+		if ( ! chmod( $state_file, 0600 ) ) {
+			throw new RuntimeException( 'The site URL recovery state permissions could not be restricted.' );
+		}
+
+		$directory_handle = fopen( $state_dir, 'r' );
+		if ( false === $directory_handle ) {
+			throw new RuntimeException( 'The site URL recovery state directory could not be synchronized.' );
+		}
+		try {
+			if ( ! fsync( $directory_handle ) ) {
+				throw new RuntimeException( 'The site URL recovery state directory could not be synchronized.' );
+			}
+		} finally {
+			fclose( $directory_handle );
+		}
+	} finally {
+		if ( is_resource( $temp_handle ) ) {
+			fclose( $temp_handle );
+		}
+		if ( ! $renamed && ( file_exists( $temp_file ) || is_link( $temp_file ) ) ) {
+			unlink( $temp_file );
+		}
+	}
+}
+
+/**
+ * Reads, exclusively locks, updates, and persists authorization state.
+ *
+ * @param callable $callback Receives state and returns state plus result.
+ * @return mixed Callback result.
+ * @throws RuntimeException When the state cannot be accessed safely.
+ */
+function sqlite_wordpress_site_url_tool_with_state( $callback ) {
+	$state_file = sqlite_wordpress_site_url_tool_state_file();
+	$state_dir  = dirname( $state_file );
+	if ( ! is_dir( $state_dir ) || ! is_writable( $state_dir ) ) {
+		throw new RuntimeException( 'The site URL recovery state directory is not writable.' );
+	}
+
+	$resolved_dir = realpath( $state_dir );
+	if ( false === $resolved_dir ) {
+		throw new RuntimeException( 'The site URL recovery state directory is invalid.' );
+	}
+	$lock_file    = $state_file . '.lock';
+	$lock_existed = file_exists( $lock_file ) || is_link( $lock_file );
+	if ( is_link( $lock_file ) ) {
+		throw new RuntimeException( 'The site URL recovery lock must not be a symbolic link.' );
+	}
+
+	$handle = fopen( $lock_file, 'c+b' );
+	if ( false === $handle ) {
+		throw new RuntimeException( 'The site URL recovery lock could not be opened.' );
+	}
+
+	try {
+		clearstatcache( true, $lock_file );
+		$resolved_lock = realpath( $lock_file );
+		if ( is_link( $lock_file ) || false === $resolved_lock || dirname( $resolved_lock ) !== $resolved_dir ) {
+			throw new RuntimeException( 'The site URL recovery lock path is unsafe.' );
+		}
+		if ( ! chmod( $lock_file, 0600 ) ) {
+			throw new RuntimeException( 'The site URL recovery lock permissions could not be restricted.' );
+		}
+		if ( ! flock( $handle, LOCK_EX ) ) {
+			throw new RuntimeException( 'The site URL recovery state could not be locked.' );
+		}
+
+		clearstatcache( true, $state_file );
+		if ( is_link( $state_file ) ) {
+			throw new RuntimeException( 'The site URL recovery state must not be a symbolic link.' );
+		}
+		if ( file_exists( $state_file ) ) {
+			$resolved_file = realpath( $state_file );
+			if ( false === $resolved_file || dirname( $resolved_file ) !== $resolved_dir || ! is_file( $state_file ) || ! is_readable( $state_file ) ) {
+				throw new RuntimeException( 'The site URL recovery state path is unsafe.' );
+			}
+			$raw = file_get_contents( $state_file, false, null, 0, 4097 );
+			if ( false === $raw || strlen( $raw ) > 4096 ) {
+				throw new RuntimeException( 'The site URL recovery state is invalid.' );
+			}
+			$state = sqlite_wordpress_site_url_tool_decode_state( $raw );
+		} elseif ( $lock_existed ) {
+			throw new RuntimeException( 'The site URL recovery state is unexpectedly missing.' );
+		} else {
+			$state = sqlite_wordpress_site_url_tool_default_state();
+		}
+
+		$update = call_user_func( $callback, $state );
+		if ( ! is_array( $update ) || ! isset( $update['state'] ) || ! array_key_exists( 'result', $update ) ) {
+			throw new RuntimeException( 'The site URL recovery state update is invalid.' );
+		}
+
+		$payload = json_encode( $update['state'], JSON_UNESCAPED_SLASHES );
+		if ( false === $payload ) {
+			throw new RuntimeException( 'The site URL recovery state could not be saved.' );
+		}
+		sqlite_wordpress_site_url_tool_write_state( $state_file, $resolved_dir, $payload );
+
+		return $update['result'];
+	} finally {
+		flock( $handle, LOCK_UN );
+		fclose( $handle );
+	}
+}
+
+/**
+ * Returns whether a new request may use the recovery authorization.
+ *
+ * @param int|null $now Optional Unix timestamp for deterministic tests.
+ * @return array<string,mixed> Availability status and retry delay.
+ */
+function sqlite_wordpress_site_url_tool_availability( $now = null ) {
+	$now = null === $now ? time() : max( 0, (int) $now );
+
+	return sqlite_wordpress_site_url_tool_with_state(
+		function ( $state ) use ( $now ) {
+			$state = sqlite_wordpress_site_url_tool_normalize_state( $state, $now );
+			$status = 'ready';
+			$retry  = 0;
+			if ( $state['used'] ) {
+				$status = 'used';
+			} elseif ( $state['locked_until'] > $now ) {
+				$status = 'locked';
+				$retry  = $state['locked_until'] - $now;
+			} elseif ( '' !== $state['operation_id'] && $state['operation_expires'] > $now ) {
+				$status = 'busy';
+				$retry  = $state['operation_expires'] - $now;
+			}
+
+			return array(
+				'state'  => $state,
+				'result' => array( 'status' => $status, 'retry_after' => $retry ),
+			);
+		}
+	);
+}
+
+/**
+ * Authenticates a request and reserves the single recovery operation.
+ *
+ * Five failures in one 15-minute window globally lock the endpoint for 15
+ * minutes. The global counter prevents distributed guessing without trusting
+ * proxy-controlled client-IP headers.
+ *
+ * @param string   $configured_credential Configured secret.
+ * @param string   $provided_credential   Submitted secret.
+ * @param int|null $now                   Optional Unix timestamp for tests.
+ * @return array<string,mixed> Authentication status and operation id.
+ */
+function sqlite_wordpress_site_url_tool_begin_operation( $configured_credential, $provided_credential, $now = null ) {
+	$now = null === $now ? time() : max( 0, (int) $now );
+
+	return sqlite_wordpress_site_url_tool_with_state(
+		function ( $state ) use ( $configured_credential, $provided_credential, $now ) {
+			$state = sqlite_wordpress_site_url_tool_normalize_state( $state, $now );
+			if ( $state['used'] ) {
+				return array( 'state' => $state, 'result' => array( 'status' => 'used', 'retry_after' => 0, 'operation_id' => '' ) );
+			}
+			if ( $state['locked_until'] > $now ) {
+				return array( 'state' => $state, 'result' => array( 'status' => 'locked', 'retry_after' => $state['locked_until'] - $now, 'operation_id' => '' ) );
+			}
+			if ( '' !== $state['operation_id'] && $state['operation_expires'] > $now ) {
+				return array( 'state' => $state, 'result' => array( 'status' => 'busy', 'retry_after' => $state['operation_expires'] - $now, 'operation_id' => '' ) );
+			}
+
+			$credential_matches = strlen( $provided_credential ) <= 1024 && hash_equals( $configured_credential, $provided_credential );
+			if ( ! $credential_matches ) {
+				if ( 0 === $state['failure_window_started'] ) {
+					$state['failure_window_started'] = $now;
+				}
+				++$state['failed_attempts'];
+				$status = 'denied';
+				$retry  = 0;
+				if ( $state['failed_attempts'] >= 5 ) {
+					$state['locked_until'] = $now + ( 15 * 60 );
+					$status                = 'locked';
+					$retry                 = 15 * 60;
+				}
+
+				return array( 'state' => $state, 'result' => array( 'status' => $status, 'retry_after' => $retry, 'operation_id' => '' ) );
+			}
+
+			$state['failed_attempts']        = 0;
+			$state['failure_window_started'] = 0;
+			$state['locked_until']           = 0;
+			$state['operation_id']           = bin2hex( random_bytes( 16 ) );
+			$state['operation_expires']      = $now + ( 5 * 60 );
+
+			return array(
+				'state'  => $state,
+				'result' => array( 'status' => 'accepted', 'retry_after' => 0, 'operation_id' => $state['operation_id'] ),
+			);
+		}
+	);
+}
+
+/**
+ * Releases a reserved operation that did not reach the database write.
+ *
+ * @param string   $operation_id Reserved operation id.
+ * @param int|null $now          Optional Unix timestamp for tests.
+ * @return bool Whether the reservation was released.
+ */
+function sqlite_wordpress_site_url_tool_cancel_operation( $operation_id, $now = null ) {
+	$now = null === $now ? time() : max( 0, (int) $now );
+
+	return sqlite_wordpress_site_url_tool_with_state(
+		function ( $state ) use ( $operation_id, $now ) {
+			$state    = sqlite_wordpress_site_url_tool_normalize_state( $state, $now );
+			$released = false;
+			if ( ! $state['used'] && '' !== $state['operation_id'] && hash_equals( $state['operation_id'], $operation_id ) ) {
+				$state['operation_id']      = '';
+				$state['operation_expires'] = 0;
+				$released                   = true;
+			}
+
+			return array( 'state' => $state, 'result' => $released );
+		}
+	);
+}
+
+/**
+ * Disables the recovery switch and removes credentials from this PHP worker.
+ *
+ * Docker's configured environment remains immutable; the persistent used flag
+ * is what closes the endpoint for every other worker and future restart.
+ *
+ * @return void
+ */
+function sqlite_wordpress_site_url_tool_disable_runtime_environment() {
+	putenv( 'WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=false' );
+	$_ENV['WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED']    = 'false';
+	$_SERVER['WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED'] = 'false';
+
+	$credential_names = array(
+		'WORDPRESS_SITE_URL_UPDATE_TOKEN',
+		'WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE',
+		'WORDPRESS_SITE_URL_UPDATE_PASSWORD',
+		'SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED',
+	);
+	foreach ( $credential_names as $credential_name ) {
+		putenv( $credential_name );
+		unset( $_ENV[ $credential_name ], $_SERVER[ $credential_name ] );
+	}
+}
+
+/**
+ * Permanently consumes the current one-shot authorization before the write.
+ *
+ * @param string   $operation_id Reserved operation id.
+ * @param int|null $now          Optional Unix timestamp for tests.
+ * @return void
+ * @throws RuntimeException When the reservation cannot be consumed.
+ */
+function sqlite_wordpress_site_url_tool_consume_operation( $operation_id, $now = null ) {
+	$now = null === $now ? time() : max( 0, (int) $now );
+
+	$consumed = sqlite_wordpress_site_url_tool_with_state(
+		function ( $state ) use ( $operation_id, $now ) {
+			$state = sqlite_wordpress_site_url_tool_normalize_state( $state, $now );
+			if ( $state['used'] || '' === $state['operation_id'] || ! hash_equals( $state['operation_id'], $operation_id ) ) {
+				return array( 'state' => $state, 'result' => false );
+			}
+
+			$state['used']                   = true;
+			$state['used_at']                = $now;
+			$state['failed_attempts']        = 0;
+			$state['failure_window_started'] = 0;
+			$state['locked_until']           = 0;
+			$state['operation_id']           = '';
+			$state['operation_expires']      = 0;
+
+			return array( 'state' => $state, 'result' => true );
+		}
+	);
+	if ( ! $consumed ) {
+		throw new RuntimeException( 'The one-time site URL recovery authorization is no longer available.' );
+	}
+
+	sqlite_wordpress_site_url_tool_disable_runtime_environment();
+}
+
+/**
+ * Best-effort release for validation and compatibility failures.
+ *
+ * @param string $operation_id Reserved operation id.
+ * @return void
+ */
+function sqlite_wordpress_site_url_tool_cancel_operation_safely( $operation_id ) {
+	if ( '' === $operation_id ) {
+		return;
+	}
+
+	try {
+		sqlite_wordpress_site_url_tool_cancel_operation( $operation_id );
+	} catch ( Throwable $error ) {
+		error_log( 'site URL recovery reservation release failed: ' . $error->getMessage() );
+	}
+}
+
+/**
  * Reads and validates the configured recovery credential.
  *
  * The *_FILE variant follows the Docker secrets convention and is preferred
@@ -100,7 +557,7 @@ function sqlite_wordpress_site_url_tool_configured_credential() {
 		}
 	} elseif ( $password_set ) {
 		$direct_token    = $password;
-		$minimum_length  = 16;
+		$minimum_length  = 24;
 		$credential_name = 'password';
 	}
 
@@ -228,7 +685,7 @@ function sqlite_wordpress_site_url_tool_render( $title, $message, $status = 'inf
 			<?php if ( $show_form ) : ?>
 				<form method="post" autocomplete="off">
 					<label for="recovery-token">Recovery Token or Password</label>
-					<input id="recovery-token" name="recovery_token" type="password" minlength="16" maxlength="1024" required autocomplete="off">
+						<input id="recovery-token" name="recovery_token" type="password" minlength="24" maxlength="1024" required autocomplete="off">
 					<small>The credential is sent only in the POST body; do not put it in the URL.</small>
 
 					<label for="wordpress-url">WordPress Address (URL)</label>
@@ -244,7 +701,7 @@ function sqlite_wordpress_site_url_tool_render( $title, $message, $status = 'inf
 			<?php elseif ( 'success' === $status_class ) : ?>
 				<p><strong>WordPress Address:</strong> <code><?php echo sqlite_wordpress_site_url_tool_escape( $wordpress_url ); ?></code></p>
 				<p><strong>Site Address:</strong> <code><?php echo sqlite_wordpress_site_url_tool_escape( $site_url ); ?></code></p>
-				<p>Disable the recovery tool now by removing its enable switch and credential configuration, then restart the container.</p>
+					<p>The one-time authorization is now locked. Remove the enable switch and credential configuration, then recreate the container to finish cleanup.</p>
 			<?php endif; ?>
 		</section>
 	</main>
@@ -349,6 +806,39 @@ function sqlite_wordpress_site_url_tool_main() {
 		return;
 	}
 
+	try {
+		$availability = sqlite_wordpress_site_url_tool_availability();
+	} catch ( RuntimeException $error ) {
+		error_log( 'site URL recovery state error: ' . $error->getMessage() );
+		http_response_code( 503 );
+		sqlite_wordpress_site_url_tool_render(
+			'Site URL Recovery Unavailable',
+			'The recovery authorization state is unavailable. Check the container logs and database-directory permissions.',
+			'error',
+			'',
+			'',
+			false
+		);
+		return;
+	}
+	if ( 'used' === $availability['status'] ) {
+		http_response_code( 404 );
+		echo 'Not Found';
+		return;
+	}
+	if ( 'locked' === $availability['status'] ) {
+		header( 'Retry-After: ' . max( 1, (int) $availability['retry_after'] ) );
+		http_response_code( 429 );
+		sqlite_wordpress_site_url_tool_render( 'Recovery Temporarily Locked', 'Too many invalid credentials were submitted. Wait 15 minutes before trying again.', 'error', '', '', false );
+		return;
+	}
+	if ( 'busy' === $availability['status'] ) {
+		header( 'Retry-After: ' . max( 1, (int) $availability['retry_after'] ) );
+		http_response_code( 409 );
+		sqlite_wordpress_site_url_tool_render( 'Recovery Already In Progress', 'Another authenticated recovery request is already in progress.', 'error', '', '', false );
+		return;
+	}
+
 	$method = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( (string) $_SERVER['REQUEST_METHOD'] ) : 'GET';
 	if ( 'GET' === $method ) {
 		sqlite_wordpress_site_url_tool_render(
@@ -368,11 +858,39 @@ function sqlite_wordpress_site_url_tool_main() {
 	$provided_credential = isset( $_POST['recovery_token'] ) && is_string( $_POST['recovery_token'] )
 		? $_POST['recovery_token']
 		: '';
-	if ( strlen( $provided_credential ) > 1024 || ! hash_equals( $configured_credential, $provided_credential ) ) {
+	try {
+		$authorization = sqlite_wordpress_site_url_tool_begin_operation( $configured_credential, $provided_credential );
+	} catch ( RuntimeException $error ) {
+		error_log( 'site URL recovery state error: ' . $error->getMessage() );
+		http_response_code( 503 );
+		sqlite_wordpress_site_url_tool_render( 'Site URL Recovery Unavailable', 'The recovery authorization state could not be updated. Check the container logs.', 'error', '', '', false );
+		return;
+	}
+	if ( 'used' === $authorization['status'] ) {
+		http_response_code( 404 );
+		echo 'Not Found';
+		return;
+	}
+	if ( 'locked' === $authorization['status'] ) {
+		error_log( 'site URL recovery authentication locked after repeated failures.' );
+		header( 'Retry-After: ' . max( 1, (int) $authorization['retry_after'] ) );
+		http_response_code( 429 );
+		sqlite_wordpress_site_url_tool_render( 'Recovery Temporarily Locked', 'Too many invalid credentials were submitted. Wait 15 minutes before trying again.', 'error', '', '', false );
+		return;
+	}
+	if ( 'busy' === $authorization['status'] ) {
+		header( 'Retry-After: ' . max( 1, (int) $authorization['retry_after'] ) );
+		http_response_code( 409 );
+		sqlite_wordpress_site_url_tool_render( 'Recovery Already In Progress', 'Another authenticated recovery request is already in progress.', 'error', '', '', false );
+		return;
+	}
+	if ( 'accepted' !== $authorization['status'] ) {
+		error_log( 'site URL recovery authentication failed.' );
 		http_response_code( 403 );
 		sqlite_wordpress_site_url_tool_render( 'Access Denied', 'The recovery credential is invalid.', 'error' );
 		return;
 	}
+	$operation_id = (string) $authorization['operation_id'];
 
 	$wordpress_input = isset( $_POST['wordpress_url'] ) ? $_POST['wordpress_url'] : '';
 	$site_input      = isset( $_POST['site_url'] ) ? $_POST['site_url'] : '';
@@ -381,6 +899,7 @@ function sqlite_wordpress_site_url_tool_main() {
 		$wordpress_url = sqlite_wordpress_site_url_tool_validate_url( $wordpress_input, 'WordPress Address (URL)' );
 		$site_url      = sqlite_wordpress_site_url_tool_validate_url( $site_input, 'Site Address (URL)' );
 	} catch ( InvalidArgumentException $error ) {
+		sqlite_wordpress_site_url_tool_cancel_operation_safely( $operation_id );
 		http_response_code( 422 );
 		sqlite_wordpress_site_url_tool_render(
 			'Invalid Address',
@@ -394,6 +913,7 @@ function sqlite_wordpress_site_url_tool_main() {
 
 	$wp_load = __DIR__ . '/wp-load.php';
 	if ( ! is_file( $wp_load ) ) {
+		sqlite_wordpress_site_url_tool_cancel_operation_safely( $operation_id );
 		http_response_code( 503 );
 		sqlite_wordpress_site_url_tool_render( 'WordPress Unavailable', 'wp-load.php was not found in the document root.', 'error', '', '', false );
 		return;
@@ -403,11 +923,13 @@ function sqlite_wordpress_site_url_tool_main() {
 	require_once $wp_load;
 
 	if ( is_multisite() ) {
+		sqlite_wordpress_site_url_tool_cancel_operation_safely( $operation_id );
 		http_response_code( 409 );
 		sqlite_wordpress_site_url_tool_render( 'Multisite Not Supported', 'This recovery tool only updates single-site installations.', 'error', $wordpress_url, $site_url );
 		return;
 	}
 	if ( defined( 'WP_SITEURL' ) || defined( 'WP_HOME' ) ) {
+		sqlite_wordpress_site_url_tool_cancel_operation_safely( $operation_id );
 		http_response_code( 409 );
 		sqlite_wordpress_site_url_tool_render(
 			'Configuration Override Detected',
@@ -422,6 +944,7 @@ function sqlite_wordpress_site_url_tool_main() {
 	$wordpress_url = sanitize_option( 'siteurl', $wordpress_url );
 	$site_url      = sanitize_option( 'home', $site_url );
 	if ( is_wp_error( $wordpress_url ) || is_wp_error( $site_url ) ) {
+		sqlite_wordpress_site_url_tool_cancel_operation_safely( $operation_id );
 		http_response_code( 422 );
 		sqlite_wordpress_site_url_tool_render( 'Invalid Address', 'WordPress rejected one or both addresses.', 'error' );
 		return;
@@ -430,23 +953,27 @@ function sqlite_wordpress_site_url_tool_main() {
 	try {
 		$wordpress_url = sqlite_wordpress_site_url_tool_validate_url( (string) $wordpress_url, 'WordPress Address (URL)' );
 		$site_url      = sqlite_wordpress_site_url_tool_validate_url( (string) $site_url, 'Site Address (URL)' );
+		sqlite_wordpress_site_url_tool_consume_operation( $operation_id );
+		$operation_id = '';
 		sqlite_wordpress_site_url_tool_update_options( $wordpress_url, $site_url );
 	} catch ( Throwable $error ) {
+		sqlite_wordpress_site_url_tool_cancel_operation_safely( $operation_id );
 		error_log( 'site URL recovery update failed: ' . $error->getMessage() );
 		http_response_code( 500 );
 		sqlite_wordpress_site_url_tool_render(
 			'Update Failed',
-			'The atomic update could not be completed. Check the container logs and verify both settings before retrying.',
+			'The atomic update could not be completed. The one-time authorization is locked; check the container logs and verify both settings before deliberately re-enabling the tool.',
 			'error',
 			$wordpress_url,
-			$site_url
+			$site_url,
+			false
 		);
 		return;
 	}
 
 	sqlite_wordpress_site_url_tool_render(
 		'Site URLs Updated',
-		'WordPress Address and Site Address were updated successfully.',
+		'WordPress Address and Site Address were updated successfully. The recovery endpoint has automatically locked its one-time authorization.',
 		'success',
 		$wordpress_url,
 		$site_url,

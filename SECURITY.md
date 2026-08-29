@@ -10,7 +10,7 @@ This policy covers issues **introduced by this project**, including:
 
 - The `Dockerfile` and the way the image is assembled (build stages, permissions, bundled files).
 - The companion must-use plugin `sqlite-select-id-key-fix.php`.
-- The disabled-by-default, token-protected `/tool-update-site-url.php`
+- The disabled-by-default, credential-protected `/tool-update-site-url.php`
   recovery endpoint.
 - The packaging and configuration of the native `wp_mysql_parser` extension.
 - The release workflows under `.github/workflows/`.
@@ -77,3 +77,13 @@ While not vulnerabilities in this image, the following practices reduce your exp
   `WORDPRESS_SITE_URL_UPDATE_PASSWORD` values are visible in container
   environment metadata. Send credentials only over TLS on untrusted networks,
   then remove the enable switch and credential immediately after the repair.
+- The recovery endpoint globally locks for 15 minutes after five invalid
+  credentials in one 15-minute window. This blocks distributed guessing but can
+  also let an exposed attacker temporarily delay the operator. Restrict the
+  endpoint with a private network or reverse-proxy IP allowlist and apply an
+  additional proxy rate limit whenever practical.
+- A recovery authorization is one-shot. It is consumed immediately before the
+  database write and remains locked across PHP workers and container restarts.
+  Do not rely on the in-process environment change to rewrite Docker Compose;
+  remove the enable switch and credential and recreate the container after use.
+  Rearm only through the documented disabled-start sequence with a new secret.
