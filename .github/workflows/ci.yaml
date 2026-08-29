@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image_changed: ${{ steps.changes.outputs.image_changed }}
+      release_version: ${{ steps.release.outputs.release_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -64,6 +65,7 @@ jobs:
           echo "image_changed=${image_changed}" >> "${GITHUB_OUTPUT}"
 
       - name: Validate release consistency
+        id: release
         run: |
           set -euo pipefail
           mapfile -t release_versions < <(
@@ -75,6 +77,7 @@ jobs:
             exit 1
           fi
           ./scripts/validate-release.sh "${release_versions[0]}"
+          echo "release_version=${release_versions[0]}" >> "${GITHUB_OUTPUT}"
 
       - name: Lint shell scripts
         run: |
@@ -120,6 +123,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify pinned WordPress base image
+        run: ./scripts/validate-release.sh "${{ needs.validate.outputs.release_version }}" --verify-upstream
 
       - name: Build amd64 image
         run: docker build --pull --tag sqlite-wordpress:test .
