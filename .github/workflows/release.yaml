@@ -5,6 +5,16 @@ on:
     tags:
       - "*.*.*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Manually specify the version (e.g. 7.1.0); leave empty to use the triggering tag name."
+        type: string
+        required: false
+        default: ""
+      force_overwrite:
+        description: "Force override: Skip existing tag detection and directly update the image tag."
+        type: boolean
+        default: false
 
 env:
   REGISTRY_IMAGE: soulteary/sqlite-wordpress
@@ -27,15 +37,22 @@ jobs:
         id: release
         env:
           RELEASE_REF_TYPE: ${{ github.ref_type }}
-          RELEASE_VERSION: ${{ github.ref_name }}
+          RELEASE_REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          if [[ "${RELEASE_REF_TYPE}" != "tag" ]]; then
-            echo "::error::Release workflow must run from a tag, not ${RELEASE_REF_TYPE}."
-            exit 1
+          if [[ -n "${INPUT_VERSION}" ]]; then
+            release_version="${INPUT_VERSION}"
+            echo "::notice::Using manually specified version ${release_version}."
+          else
+            if [[ "${RELEASE_REF_TYPE}" != "tag" ]]; then
+              echo "::error::Release workflow must run from a tag (or provide the version input), not ${RELEASE_REF_TYPE}."
+              exit 1
+            fi
+            release_version="${RELEASE_REF_NAME}"
           fi
-          ./scripts/validate-release.sh "${RELEASE_VERSION}"
-          echo "version=${RELEASE_VERSION}" >> "${GITHUB_OUTPUT}"
+          ./scripts/validate-release.sh "${release_version}"
+          echo "version=${release_version}" >> "${GITHUB_OUTPUT}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
@@ -61,6 +78,7 @@ jobs:
           ./scripts/validate-release.sh "${RELEASE_VERSION}" --verify-upstream
 
       - name: Ensure version tags do not already exist
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.force_overwrite != true }}
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
