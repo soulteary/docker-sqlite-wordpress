@@ -96,7 +96,7 @@ function sqlite_wordpress_site_url_tool_default_state() {
  */
 function sqlite_wordpress_site_url_tool_decode_state( $raw ) {
 	if ( '' === $raw ) {
-		return sqlite_wordpress_site_url_tool_default_state();
+		throw new RuntimeException( 'The site URL recovery state is unexpectedly empty.' );
 	}
 
 	$state = json_decode( $raw, true );
@@ -159,6 +159,82 @@ function sqlite_wordpress_site_url_tool_normalize_state( $state, $now ) {
 }
 
 /**
+ * Atomically persists state through a same-directory temporary file.
+ *
+ * The temporary file is synced before rename, then the containing directory is
+ * synced so a successful call survives process or host interruption. The old
+ * complete state remains visible until the atomic rename.
+ *
+ * @param string $state_file  Destination state file.
+ * @param string $state_dir   Resolved state directory.
+ * @param string $payload     Encoded state.
+ * @return void
+ * @throws RuntimeException When durable persistence fails.
+ */
+function sqlite_wordpress_site_url_tool_write_state( $state_file, $state_dir, $payload ) {
+	$temp_file = tempnam( $state_dir, '.ht.site-url-state.tmp-' );
+	if ( false === $temp_file ) {
+		throw new RuntimeException( 'A temporary site URL recovery state could not be created.' );
+	}
+
+	$temp_handle = null;
+	$renamed     = false;
+	try {
+		$resolved_temp = realpath( $temp_file );
+		if ( false === $resolved_temp || dirname( $resolved_temp ) !== $state_dir || is_link( $temp_file ) ) {
+			throw new RuntimeException( 'The temporary site URL recovery state path is unsafe.' );
+		}
+
+		$temp_handle = fopen( $temp_file, 'wb' );
+		if ( false === $temp_handle || ! chmod( $temp_file, 0600 ) ) {
+			throw new RuntimeException( 'The temporary site URL recovery state could not be opened safely.' );
+		}
+
+		$offset = 0;
+		$length = strlen( $payload );
+		while ( $offset < $length ) {
+			$written = fwrite( $temp_handle, substr( $payload, $offset ) );
+			if ( false === $written || 0 === $written ) {
+				throw new RuntimeException( 'The site URL recovery state could not be saved.' );
+			}
+			$offset += $written;
+		}
+		if ( ! fflush( $temp_handle ) || ! fsync( $temp_handle ) ) {
+			throw new RuntimeException( 'The site URL recovery state could not be synchronized.' );
+		}
+		fclose( $temp_handle );
+		$temp_handle = null;
+
+		if ( ! rename( $temp_file, $state_file ) ) {
+			throw new RuntimeException( 'The site URL recovery state could not be replaced atomically.' );
+		}
+		$renamed = true;
+		if ( ! chmod( $state_file, 0600 ) ) {
+			throw new RuntimeException( 'The site URL recovery state permissions could not be restricted.' );
+		}
+
+		$directory_handle = fopen( $state_dir, 'r' );
+		if ( false === $directory_handle ) {
+			throw new RuntimeException( 'The site URL recovery state directory could not be synchronized.' );
+		}
+		try {
+			if ( ! fsync( $directory_handle ) ) {
+				throw new RuntimeException( 'The site URL recovery state directory could not be synchronized.' );
+			}
+		} finally {
+			fclose( $directory_handle );
+		}
+	} finally {
+		if ( is_resource( $temp_handle ) ) {
+			fclose( $temp_handle );
+		}
+		if ( ! $renamed && ( file_exists( $temp_file ) || is_link( $temp_file ) ) ) {
+			unlink( $temp_file );
+		}
+	}
+}
+
+/**
  * Reads, exclusively locks, updates, and persists authorization state.
  *
  * @param callable $callback Receives state and returns state plus result.
@@ -171,57 +247,65 @@ function sqlite_wordpress_site_url_tool_with_state( $callback ) {
 	if ( ! is_dir( $state_dir ) || ! is_writable( $state_dir ) ) {
 		throw new RuntimeException( 'The site URL recovery state directory is not writable.' );
 	}
-	if ( is_link( $state_file ) ) {
-		throw new RuntimeException( 'The site URL recovery state must not be a symbolic link.' );
+
+	$resolved_dir = realpath( $state_dir );
+	if ( false === $resolved_dir ) {
+		throw new RuntimeException( 'The site URL recovery state directory is invalid.' );
+	}
+	$lock_file    = $state_file . '.lock';
+	$lock_existed = file_exists( $lock_file ) || is_link( $lock_file );
+	if ( is_link( $lock_file ) ) {
+		throw new RuntimeException( 'The site URL recovery lock must not be a symbolic link.' );
 	}
 
-	$handle = fopen( $state_file, 'c+b' );
+	$handle = fopen( $lock_file, 'c+b' );
 	if ( false === $handle ) {
-		throw new RuntimeException( 'The site URL recovery state could not be opened.' );
+		throw new RuntimeException( 'The site URL recovery lock could not be opened.' );
 	}
 
 	try {
-		clearstatcache( true, $state_file );
-		$resolved_dir  = realpath( $state_dir );
-		$resolved_file = realpath( $state_file );
-		if ( is_link( $state_file ) || false === $resolved_dir || false === $resolved_file || dirname( $resolved_file ) !== $resolved_dir ) {
-			throw new RuntimeException( 'The site URL recovery state path is unsafe.' );
+		clearstatcache( true, $lock_file );
+		$resolved_lock = realpath( $lock_file );
+		if ( is_link( $lock_file ) || false === $resolved_lock || dirname( $resolved_lock ) !== $resolved_dir ) {
+			throw new RuntimeException( 'The site URL recovery lock path is unsafe.' );
 		}
-		if ( ! chmod( $state_file, 0600 ) ) {
-			throw new RuntimeException( 'The site URL recovery state permissions could not be restricted.' );
+		if ( ! chmod( $lock_file, 0600 ) ) {
+			throw new RuntimeException( 'The site URL recovery lock permissions could not be restricted.' );
 		}
 		if ( ! flock( $handle, LOCK_EX ) ) {
 			throw new RuntimeException( 'The site URL recovery state could not be locked.' );
 		}
 
-		rewind( $handle );
-		$raw = stream_get_contents( $handle, 4097 );
-		if ( false === $raw || strlen( $raw ) > 4096 ) {
-			throw new RuntimeException( 'The site URL recovery state is invalid.' );
+		clearstatcache( true, $state_file );
+		if ( is_link( $state_file ) ) {
+			throw new RuntimeException( 'The site URL recovery state must not be a symbolic link.' );
 		}
-		$state  = sqlite_wordpress_site_url_tool_decode_state( $raw );
+		if ( file_exists( $state_file ) ) {
+			$resolved_file = realpath( $state_file );
+			if ( false === $resolved_file || dirname( $resolved_file ) !== $resolved_dir || ! is_file( $state_file ) || ! is_readable( $state_file ) ) {
+				throw new RuntimeException( 'The site URL recovery state path is unsafe.' );
+			}
+			$raw = file_get_contents( $state_file, false, null, 0, 4097 );
+			if ( false === $raw || strlen( $raw ) > 4096 ) {
+				throw new RuntimeException( 'The site URL recovery state is invalid.' );
+			}
+			$state = sqlite_wordpress_site_url_tool_decode_state( $raw );
+		} elseif ( $lock_existed ) {
+			throw new RuntimeException( 'The site URL recovery state is unexpectedly missing.' );
+		} else {
+			$state = sqlite_wordpress_site_url_tool_default_state();
+		}
+
 		$update = call_user_func( $callback, $state );
 		if ( ! is_array( $update ) || ! isset( $update['state'] ) || ! array_key_exists( 'result', $update ) ) {
 			throw new RuntimeException( 'The site URL recovery state update is invalid.' );
 		}
 
 		$payload = json_encode( $update['state'], JSON_UNESCAPED_SLASHES );
-		if ( false === $payload || ! ftruncate( $handle, 0 ) ) {
+		if ( false === $payload ) {
 			throw new RuntimeException( 'The site URL recovery state could not be saved.' );
 		}
-		rewind( $handle );
-		$offset = 0;
-		$length = strlen( $payload );
-		while ( $offset < $length ) {
-			$written = fwrite( $handle, substr( $payload, $offset ) );
-			if ( false === $written || 0 === $written ) {
-				throw new RuntimeException( 'The site URL recovery state could not be saved.' );
-			}
-			$offset += $written;
-		}
-		if ( ! fflush( $handle ) ) {
-			throw new RuntimeException( 'The site URL recovery state could not be saved.' );
-		}
+		sqlite_wordpress_site_url_tool_write_state( $state_file, $resolved_dir, $payload );
 
 		return $update['result'];
 	} finally {

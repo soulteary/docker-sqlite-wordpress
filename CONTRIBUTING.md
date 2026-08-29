@@ -92,6 +92,8 @@ must preserve these security properties:
 - only one authenticated operation can run, and a write attempt consumes the
   authorization before updating SQLite;
 - the persistent used state blocks new PHP workers and container restarts;
+- state replacement is atomic and synchronized, while interrupted, empty,
+  missing, malformed, or symbolic-link state fails closed;
 - starting once with the enable value absent or not exactly `true` clears the
   used state without enabling the endpoint.
 

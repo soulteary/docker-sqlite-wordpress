@@ -131,13 +131,17 @@ if [ -d "$src_content" ] && [ -d "$DOCROOT" ]; then
 	# container restart cannot reopen the endpoint. A deliberately disabled start
 	# clears the latch and rearms a future enable cycle.
 	recovery_state_file="$dst_content/database/.ht.site-url-update-tool-state"
-	if [ "${WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED:-}" != 'true' ] \
-		&& { [ -e "$recovery_state_file" ] || [ -L "$recovery_state_file" ]; }; then
-		if [ -d "$recovery_state_file" ] && [ ! -L "$recovery_state_file" ]; then
-			echo >&2 "sqlite: recovery state path must not be a directory: $recovery_state_file"
-			exit 1
-		fi
-		rm -f -- "$recovery_state_file"
+	recovery_lock_file="${recovery_state_file}.lock"
+	if [ "${WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED:-}" != 'true' ]; then
+		for recovery_path in "$recovery_state_file" "$recovery_lock_file"; do
+			if [ -e "$recovery_path" ] || [ -L "$recovery_path" ]; then
+				if [ -d "$recovery_path" ] && [ ! -L "$recovery_path" ]; then
+					echo >&2 "sqlite: recovery state path must not be a directory: $recovery_path"
+					exit 1
+				fi
+				rm -f -- "$recovery_path"
+			fi
+		done
 	fi
 
 	# Best-effort ownership/permissions so www-data can create/write the DB.

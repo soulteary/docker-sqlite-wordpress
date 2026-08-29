@@ -17,6 +17,9 @@
 - Made each enabled recovery authorization one-shot. It is consumed before the
   SQLite write, disables the current PHP worker, and remains locked for every
   worker and container restart until an explicit disabled start rearms it.
+- Persisted throttle and one-shot state with a stable file lock, synchronized
+  same-directory temporary file, atomic replacement, and directory sync;
+  interrupted, empty, missing, or malformed existing state now fails closed.
 - Increased the direct recovery password minimum from 16 to 24 characters and
   documented generated credentials, private-network exposure, TLS, IP
   allowlists, and reverse-proxy rate limiting.

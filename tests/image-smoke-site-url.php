@@ -48,9 +48,12 @@ function sqlite_wordpress_image_smoke_request( $method, $credential = '', $siteu
 
 $credential = str_repeat( 'p', 24 );
 $state_file = '/var/www/html/wp-content/database/.ht.site-url-update-tool-state';
-if ( is_link( $state_file ) || ( file_exists( $state_file ) && ! unlink( $state_file ) ) ) {
-	fwrite( STDERR, "FAIL: could not reset recovery state fixture\n" );
-	exit( 1 );
+$lock_file  = $state_file . '.lock';
+foreach ( array( $state_file, $lock_file ) as $recovery_file ) {
+	if ( is_link( $recovery_file ) || ( file_exists( $recovery_file ) && ! unlink( $recovery_file ) ) ) {
+		fwrite( STDERR, "FAIL: could not reset recovery state fixture\n" );
+		exit( 1 );
+	}
 }
 
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true' );
@@ -70,6 +73,7 @@ for ( $attempt = 1; $attempt <= 5; ++$attempt ) {
 }
 
 sqlite_wordpress_image_smoke_assert( unlink( $state_file ), 'test fixture can reset the lockout state' );
+sqlite_wordpress_image_smoke_assert( unlink( $lock_file ), 'test fixture can reset the lockout guard' );
 $response = sqlite_wordpress_image_smoke_request(
 	'POST',
 	$credential,

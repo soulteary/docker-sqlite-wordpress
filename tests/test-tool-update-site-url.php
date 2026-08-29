@@ -8,6 +8,7 @@ if ( false === $site_url_tool_state_file ) {
 	fwrite( STDERR, "FAIL: could not create state fixture\n" );
 	exit( 1 );
 }
+unlink( $site_url_tool_state_file );
 
 define( 'SQLITE_WORDPRESS_SITE_URL_TOOL_TESTING', true );
 define( 'SQLITE_WORDPRESS_SITE_URL_TOOL_STATE_FILE', $site_url_tool_state_file );
@@ -136,7 +137,6 @@ putenv( 'WORDPRESS_SITE_URL_UPDATE_PASSWORD' );
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED' );
 unlink( $token_file );
 
-file_put_contents( $site_url_tool_state_file, '' );
 $state_time = 1000000;
 site_url_tool_assert_same(
 	array( 'status' => 'ready', 'retry_after' => 0 ),
@@ -203,7 +203,22 @@ site_url_tool_assert_throws(
 	RuntimeException::class,
 	'malformed authorization state fails closed'
 );
+file_put_contents( $site_url_tool_state_file, '' );
+site_url_tool_assert_throws(
+	function () use ( $state_time ) {
+		sqlite_wordpress_site_url_tool_availability( $state_time + 911 );
+	},
+	RuntimeException::class,
+	'unexpectedly empty authorization state fails closed'
+);
 unlink( $site_url_tool_state_file );
+site_url_tool_assert_throws(
+	function () use ( $state_time ) {
+		sqlite_wordpress_site_url_tool_availability( $state_time + 912 );
+	},
+	RuntimeException::class,
+	'missing authorization state with an existing lock fails closed'
+);
 $state_symlink_target = tempnam( sys_get_temp_dir(), 'site-url-state-target-' );
 if ( false === $state_symlink_target || ! symlink( $state_symlink_target, $site_url_tool_state_file ) ) {
 	fwrite( STDERR, "FAIL: could not create state symlink fixture\n" );
@@ -211,14 +226,13 @@ if ( false === $state_symlink_target || ! symlink( $state_symlink_target, $site_
 }
 site_url_tool_assert_throws(
 	function () use ( $state_time ) {
-		sqlite_wordpress_site_url_tool_availability( $state_time + 911 );
+		sqlite_wordpress_site_url_tool_availability( $state_time + 913 );
 	},
 	RuntimeException::class,
 	'symbolic-link authorization state fails closed'
 );
 unlink( $site_url_tool_state_file );
 unlink( $state_symlink_target );
-file_put_contents( $site_url_tool_state_file, '' );
 
 $valid_urls = array(
 	'public URL'       => array( 'https://example.com/', 'https://example.com' ),
@@ -395,5 +409,11 @@ site_url_tool_assert_same(
 	'option caches are cleared after rollback'
 );
 
-unlink( $site_url_tool_state_file );
+if ( file_exists( $site_url_tool_state_file ) || is_link( $site_url_tool_state_file ) ) {
+	unlink( $site_url_tool_state_file );
+}
+$site_url_tool_lock_file = $site_url_tool_state_file . '.lock';
+if ( file_exists( $site_url_tool_lock_file ) || is_link( $site_url_tool_lock_file ) ) {
+	unlink( $site_url_tool_lock_file );
+}
 fwrite( STDOUT, "tool-update-site-url tests passed\n" );
