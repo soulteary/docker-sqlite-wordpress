@@ -86,6 +86,10 @@ While not vulnerabilities in this image, the following practices reduce your exp
   also let an exposed attacker temporarily delay the operator. Restrict the
   endpoint with a private network or reverse-proxy IP allowlist and apply an
   additional proxy rate limit whenever practical.
+- Bind temporary recovery deployments to a loopback address by default. When a
+  reverse proxy is required, restrict `/tool-update-site-url.php` by source IP,
+  disable caching for the route, preserve POST, and forward the original `Host`
+  and `X-Forwarded-Proto` headers.
 - A recovery authorization is one-shot. It is consumed immediately before the
   database write and remains locked across PHP workers and container restarts.
   Do not rely on the in-process environment change to rewrite Docker Compose;

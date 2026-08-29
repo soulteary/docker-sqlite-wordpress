@@ -66,9 +66,9 @@ docker pull ghcr.io/soulteary/sqlite-wordpress:7.1.0
 Use the following command to quickly launch the wordpress with port `8080`:
 
 ```bash
-docker run --rm -it -p 8080:80 -v "$(pwd)/wordpress:/var/www/html" soulteary/sqlite-wordpress
+docker run --rm -it -p 127.0.0.1:8080:80 -v "$(pwd)/wordpress:/var/www/html" soulteary/sqlite-wordpress
 # or use GHCR
-docker run --rm -it -p 8080:80 -v "$(pwd)/wordpress:/var/www/html" ghcr.io/soulteary/sqlite-wordpress:latest
+docker run --rm -it -p 127.0.0.1:8080:80 -v "$(pwd)/wordpress:/var/www/html" ghcr.io/soulteary/sqlite-wordpress:latest
 ```
 
 You can also use docker compose to start wordpress:
@@ -81,7 +81,9 @@ services:
     # or use: ghcr.io/soulteary/sqlite-wordpress:7.1.0
     restart: always
     ports:
-      - 8080:80
+      # Safe local default. Change this only when intentionally publishing the
+      # site through a firewall or TLS reverse proxy.
+      - 127.0.0.1:8080:80
     volumes:
       - ./wordpress:/var/www/html
 ```
@@ -110,14 +112,6 @@ for the underlying compatibility boundary.
 
 ## Emergency Site URL Recovery Tool
 
-> **Availability:** this tool was added to `main` after the immutable `7.1.0`
-> release. The published `7.1.0` and current `latest` images do not contain it.
-> Until the next release, build the current repository and use a local image:
->
-> ```bash
-> docker build -t sqlite-wordpress:site-url-recovery .
-> ```
-
 The image includes `/tool-update-site-url.php` for recovering a site after an
 incorrect domain, scheme, port, or subdirectory was saved in WordPress. The
 standalone page remains reachable even when the normal site or `wp-admin`
@@ -127,6 +121,11 @@ transaction:
 - **WordPress Address (URL)** → the `siteurl` option (where WordPress core files
   are located).
 - **Site Address (URL)** → the `home` option (the public visitor-facing URL).
+
+This is an access-recovery tool, not a complete domain-migration utility. It
+does not rewrite links in posts, serialized plugin data, media URLs, theme
+settings, redirects, CDN configuration, or reverse-proxy rules. Complete those
+changes separately after access to WordPress has been restored.
 
 ### Security model
 
@@ -167,6 +166,12 @@ lockout. Keep the endpoint on a private network or IP allowlist and add reverse
 proxy rate limiting when it must be internet-reachable. Always use TLS outside
 the local machine.
 
+The examples below bind the recovery endpoint to `127.0.0.1`. If it must pass
+through a reverse proxy, restrict this exact path by source IP, disable proxy
+caching, preserve POST requests, and forward the original `Host` and
+`X-Forwarded-Proto` headers. Do not publish the endpoint directly on every host
+interface merely to complete a repair.
+
 ### Preferred TOKEN_FILE example
 
 Create a random token file:
@@ -181,10 +186,9 @@ chmod 600 secrets/site-url-update-token
 services:
 
   wordpress:
-    build: .
-    image: sqlite-wordpress:site-url-recovery
+    image: soulteary/sqlite-wordpress:7.1.0
     ports:
-      - 8080:80
+      - 127.0.0.1:8080:80
     environment:
       WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED: "true"
       WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE: /run/secrets/site-url-update-token
@@ -212,10 +216,9 @@ export WORDPRESS_SITE_URL_UPDATE_PASSWORD="$(openssl rand -base64 24)"
 services:
 
   wordpress:
-    build: .
-    image: sqlite-wordpress:site-url-recovery
+    image: soulteary/sqlite-wordpress:7.1.0
     ports:
-      - 8080:80
+      - 127.0.0.1:8080:80
     environment:
       WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED: "true"
       WORDPRESS_SITE_URL_UPDATE_PASSWORD: "${WORDPRESS_SITE_URL_UPDATE_PASSWORD:?export a recovery password first}"
@@ -227,6 +230,40 @@ The repository's [`docker-compose.yml`](./docker-compose.yml) contains the same
 PASSWORD settings with safe disabled/empty defaults and commented TOKEN_FILE
 alternatives. Because direct passwords appear in `docker inspect`, prefer the
 TOKEN_FILE example for shared hosts.
+
+### docker run examples
+
+For TOKEN_FILE, mount the generated file read-only and publish the endpoint only
+on the loopback interface:
+
+```bash
+docker run --rm -it \
+  --name sqlite-wordpress-recovery \
+  --publish 127.0.0.1:8080:80 \
+  --volume "$(pwd)/wordpress:/var/www/html" \
+  --volume "$(pwd)/secrets/site-url-update-token:/run/secrets/site-url-update-token:ro" \
+  --env WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true \
+  --env WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE=/run/secrets/site-url-update-token \
+  soulteary/sqlite-wordpress:7.1.0
+```
+
+For PASSWORD, export a fresh value and pass only the variable name so the shell
+does not place the secret directly in the command arguments:
+
+```bash
+export WORDPRESS_SITE_URL_UPDATE_PASSWORD="$(openssl rand -base64 24)"
+docker run --rm -it \
+  --name sqlite-wordpress-recovery \
+  --publish 127.0.0.1:8080:80 \
+  --volume "$(pwd)/wordpress:/var/www/html" \
+  --env WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true \
+  --env WORDPRESS_SITE_URL_UPDATE_PASSWORD \
+  soulteary/sqlite-wordpress:7.1.0
+```
+
+After the update, stop this temporary container and start the normal deployment
+without the enable switch or recovery credential. That disabled start performs
+the documented cleanup.
 
 ### Recovery workflow and automatic shutdown
 
@@ -250,10 +287,11 @@ enable setting removed or set to `false`. Then configure a new credential, set
 the exact value `true`, and recreate it again. Merely restarting with the same
 enabled configuration never clears a consumed authorization.
 
-The managed latch is
-`wp-content/database/.ht.site-url-update-tool-state`. Do not delete or edit it
-while the endpoint is enabled; the entrypoint removes it safely during the
-documented disabled start.
+The managed authorization state consists of
+`wp-content/database/.ht.site-url-update-tool-state` and its stable `.lock`
+file. Do not delete, edit, replace, or restore either file while the endpoint is
+enabled; the entrypoint removes both safely during the documented disabled
+start. A missing or malformed member of an existing state pair fails closed.
 
 ### Accepted URL rules
 
@@ -283,13 +321,19 @@ endpoint intentionally avoids returning sensitive configuration details.
 | `409` | Another authenticated request is active, Multisite is enabled, or `WP_HOME` / `WP_SITEURL` overrides the database. | Wait for the active request, or correct the unsupported WordPress configuration. |
 | `422` | A submitted URL failed validation. | Apply the accepted URL rules above and submit both fields again. |
 | `429` | Five failed credentials triggered the 15-minute global lockout. | Wait for `Retry-After`, inspect logs, and restrict network access before retrying. |
-| `500` | The atomic SQLite update failed after the one-shot authorization was consumed. | Inspect logs and both option values, then deliberately rearm only if another attempt is required. |
+| `500` | The update or one-shot state transition failed; the authorization may already have been consumed. | Inspect logs and both option values, confirm whether the endpoint now returns 404, then deliberately rearm only if another attempt is required. |
 | `503` | Invalid credential configuration, unreadable state/database directory, or missing WordPress runtime. | Check logs, file mounts, permissions, and mutually exclusive credential settings. |
 
 The tool intentionally refuses WordPress Multisite installations. It also
 refuses to write when `WP_HOME` or `WP_SITEURL` is defined in `wp-config.php`,
 because those constants override the database values; update or remove the
 constants instead.
+
+If WordPress still redirects to the old address after a successful update,
+check `WP_HOME` / `WP_SITEURL`, page and object caches, CDN or proxy redirects,
+and forwarded `Host` / `X-Forwarded-Proto` headers. The recovery tool changes
+only the two database options and cannot repair content URLs or external proxy
+configuration.
 
 ## Volume and Upgrade Notes
 
