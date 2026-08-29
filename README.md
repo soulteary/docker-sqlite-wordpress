@@ -109,10 +109,20 @@ these independent conditions are met:
 
 1. `WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED` is set to the exact lowercase value
    `true`.
-2. A strong recovery token is configured.
+2. Exactly one strong recovery credential is configured.
 
 Values such as `1`, `yes`, or `TRUE` do not enable the tool. A Docker secret is
-preferred for the token so it does not appear in `docker inspect` output:
+preferred for the token so it does not appear in `docker inspect` output.
+Choose exactly one of these credential sources:
+
+| Variable | Minimum length | Notes |
+| --- | ---: | --- |
+| `WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE` | 32 characters | Preferred. Reads a Docker secret or mounted file. |
+| `WORDPRESS_SITE_URL_UPDATE_TOKEN` | 32 characters | Direct token; visible in container environment metadata. |
+| `WORDPRESS_SITE_URL_UPDATE_PASSWORD` | 16 characters | Direct password; visible in container environment metadata. |
+
+Do not configure more than one source at the same time. To use the preferred
+file-based token:
 
 ```bash
 mkdir -p secrets
@@ -141,16 +151,19 @@ secrets:
 ```
 
 Recreate the container, then open
-`http://localhost:8080/tool-update-site-url.php`. Enter the generated token and
-the two desired addresses. The token is accepted only in the POST body; never
-append it to the URL. When the site works at its new address, remove both
-`WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED` and the token configuration, then
-recreate the container so the endpoint returns 404 again.
+`http://localhost:8080/tool-update-site-url.php`. Enter the configured token or
+password and the two desired addresses. The credential is accepted only in the
+POST body; never append it to the URL. When the site works at its new address,
+remove both `WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED` and the selected credential
+configuration, then recreate the container so the endpoint returns 404 again.
 
-For a short-lived local recovery, the token can instead be passed directly as
-`WORDPRESS_SITE_URL_UPDATE_TOKEN`. Generate it with `openssl rand -hex 32` and
-set `WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true` at the same time. Use TLS
-whenever the endpoint is reachable across an untrusted network.
+For a short-lived local recovery, either pass a generated token directly as
+`WORDPRESS_SITE_URL_UPDATE_TOKEN`, or set a strong password through
+`WORDPRESS_SITE_URL_UPDATE_PASSWORD`. Set
+`WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true` at the same time. Direct values
+are visible through `docker inspect`, so prefer the file-based token for shared
+or long-running hosts. Use TLS whenever the endpoint is reachable across an
+untrusted network.
 
 The tool intentionally refuses WordPress Multisite installations. It also
 refuses to write when `WP_HOME` or `WP_SITEURL` is defined in `wp-config.php`,

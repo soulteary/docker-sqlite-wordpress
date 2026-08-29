@@ -42,6 +42,7 @@ function site_url_tool_assert_throws( $callback, $exception, $label ) {
 
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN' );
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE' );
+putenv( 'WORDPRESS_SITE_URL_UPDATE_PASSWORD' );
 putenv( 'SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED' );
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED' );
 site_url_tool_assert_same( false, sqlite_wordpress_site_url_tool_is_enabled(), 'tool is disabled without an enable switch' );
@@ -53,12 +54,12 @@ foreach ( $disabled_values as $disabled_value ) {
 }
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true' );
 site_url_tool_assert_same( true, sqlite_wordpress_site_url_tool_is_enabled(), 'exact lowercase true enables the tool' );
-site_url_tool_assert_same( null, sqlite_wordpress_site_url_tool_configured_token(), 'enabled tool still requires a token' );
+site_url_tool_assert_same( null, sqlite_wordpress_site_url_tool_configured_credential(), 'enabled tool still requires a credential' );
 
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN=too-short' );
 site_url_tool_assert_throws(
 	function () {
-		sqlite_wordpress_site_url_tool_configured_token();
+		sqlite_wordpress_site_url_tool_configured_credential();
 	},
 	RuntimeException::class,
 	'weak direct token is rejected'
@@ -66,7 +67,7 @@ site_url_tool_assert_throws(
 
 $strong_token = str_repeat( 'a', 64 );
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN=' . $strong_token );
-site_url_tool_assert_same( $strong_token, sqlite_wordpress_site_url_tool_configured_token(), 'strong direct token is accepted' );
+site_url_tool_assert_same( $strong_token, sqlite_wordpress_site_url_tool_configured_credential(), 'strong direct token is accepted' );
 
 $token_file = tempnam( sys_get_temp_dir(), 'site-url-token-' );
 if ( false === $token_file ) {
@@ -76,24 +77,57 @@ if ( false === $token_file ) {
 file_put_contents( $token_file, str_repeat( 'b', 64 ) . "\n" );
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN' );
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE=' . $token_file );
-site_url_tool_assert_same( str_repeat( 'b', 64 ), sqlite_wordpress_site_url_tool_configured_token(), 'Docker secret token is accepted' );
+site_url_tool_assert_same( str_repeat( 'b', 64 ), sqlite_wordpress_site_url_tool_configured_credential(), 'Docker secret token is accepted' );
 
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN=' . $strong_token );
 site_url_tool_assert_throws(
 	function () {
-		sqlite_wordpress_site_url_tool_configured_token();
+		sqlite_wordpress_site_url_tool_configured_credential();
 	},
 	RuntimeException::class,
 	'ambiguous token sources are rejected'
 );
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN' );
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE' );
-unlink( $token_file );
 
 putenv( 'SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED=' . str_repeat( 'c', 64 ) );
-site_url_tool_assert_same( str_repeat( 'c', 64 ), sqlite_wordpress_site_url_tool_configured_token(), 'entrypoint-resolved secret is accepted' );
+site_url_tool_assert_same( str_repeat( 'c', 64 ), sqlite_wordpress_site_url_tool_configured_credential(), 'entrypoint-resolved secret is accepted' );
 putenv( 'SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED' );
+
+putenv( 'WORDPRESS_SITE_URL_UPDATE_PASSWORD=too-short' );
+site_url_tool_assert_throws(
+	function () {
+		sqlite_wordpress_site_url_tool_configured_credential();
+	},
+	RuntimeException::class,
+	'weak password is rejected'
+);
+$strong_password = str_repeat( 'p', 16 );
+putenv( 'WORDPRESS_SITE_URL_UPDATE_PASSWORD=' . $strong_password );
+site_url_tool_assert_same( $strong_password, sqlite_wordpress_site_url_tool_configured_credential(), 'strong direct password is accepted' );
+
+putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE=' . $token_file );
+site_url_tool_assert_throws(
+	function () {
+		sqlite_wordpress_site_url_tool_configured_credential();
+	},
+	RuntimeException::class,
+	'password and token file cannot be configured together'
+);
+putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE' );
+
+putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN=' . $strong_token );
+site_url_tool_assert_throws(
+	function () {
+		sqlite_wordpress_site_url_tool_configured_credential();
+	},
+	RuntimeException::class,
+	'password and token cannot be configured together'
+);
+putenv( 'WORDPRESS_SITE_URL_UPDATE_TOKEN' );
+putenv( 'WORDPRESS_SITE_URL_UPDATE_PASSWORD' );
 putenv( 'WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED' );
+unlink( $token_file );
 
 $valid_urls = array(
 	'public URL'       => array( 'https://example.com/', 'https://example.com' ),
