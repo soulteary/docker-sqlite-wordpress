@@ -107,6 +107,7 @@ if [ -d "$src_content" ] && [ -d "$DOCROOT" ]; then
 		managed_mu_plugin_files=(
 			"sqlite-database-integration-loader.php"
 			"sqlite-diagnostics.php"
+			"sqlite-local-core-update.php"
 			"sqlite-select-id-key-fix.php"
 		)
 		for managed_file in "${managed_mu_plugin_files[@]}"; do

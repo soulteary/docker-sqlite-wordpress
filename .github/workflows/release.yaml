@@ -3,18 +3,12 @@ name: Release
 on:
   push:
     tags:
-      - "*.*.*"
+      - "[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]-r[0-9]*"
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Manually specify the version (e.g. 7.1.0); leave empty to use the triggering tag name."
-        type: string
-        required: false
-        default: ""
-      force_overwrite:
-        description: "Force override: Skip existing tag detection and directly update the image tag."
-        type: boolean
-        default: false
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   REGISTRY_IMAGE: soulteary/sqlite-wordpress
@@ -22,37 +16,56 @@ env:
 
 jobs:
   preflight:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
       packages: read
     outputs:
       version: ${{ steps.release.outputs.version }}
+      source_sha: ${{ steps.release.outputs.source_sha }}
     steps:
-      - name: Checkout
+      - name: Checkout protected release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Validate release ref and project versions
+      - name: Validate release tag and project versions
         id: release
         env:
+          RELEASE_REF_PROTECTED: ${{ github.ref_protected }}
           RELEASE_REF_TYPE: ${{ github.ref_type }}
           RELEASE_REF_NAME: ${{ github.ref_name }}
-          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          if [[ -n "${INPUT_VERSION}" ]]; then
-            release_version="${INPUT_VERSION}"
-            echo "::notice::Using manually specified version ${release_version}."
-          else
-            if [[ "${RELEASE_REF_TYPE}" != "tag" ]]; then
-              echo "::error::Release workflow must run from a tag (or provide the version input), not ${RELEASE_REF_TYPE}."
-              exit 1
-            fi
-            release_version="${RELEASE_REF_NAME}"
+          if [[ "${RELEASE_REF_TYPE}" != "tag" ]]; then
+            echo "::error::Release workflow must run from an existing protected tag, not ${RELEASE_REF_TYPE}."
+            exit 1
           fi
-          ./scripts/validate-release.sh "${release_version}"
-          echo "version=${release_version}" >> "${GITHUB_OUTPUT}"
+          if [[ "${RELEASE_REF_PROTECTED}" != "true" ]]; then
+            echo "::error::Release tag ${RELEASE_REF_NAME} is not covered by an active GitHub ruleset."
+            exit 1
+          fi
+          if [[ "$(git cat-file -t "refs/tags/${RELEASE_REF_NAME}")" != "tag" ]]; then
+            echo "::error::Release tag ${RELEASE_REF_NAME} must be annotated."
+            exit 1
+          fi
+
+          source_sha="$(git rev-parse "refs/tags/${RELEASE_REF_NAME}^{commit}")"
+          checkout_sha="$(git rev-parse HEAD)"
+          if [[ "${source_sha}" != "${checkout_sha}" ]]; then
+            echo "::error::Checkout ${checkout_sha} does not match release tag commit ${source_sha}."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "${source_sha}" refs/remotes/origin/main; then
+            echo "::error::Release tag ${RELEASE_REF_NAME} must point to a commit already on main."
+            exit 1
+          fi
+
+          ./scripts/validate-release.sh "${RELEASE_REF_NAME}"
+          echo "version=${RELEASE_REF_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "source_sha=${source_sha}" >> "${GITHUB_OUTPUT}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
@@ -73,19 +86,16 @@ jobs:
       - name: Verify pinned WordPress base image
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
-        run: |
-          set -euo pipefail
-          ./scripts/validate-release.sh "${RELEASE_VERSION}" --verify-upstream
+        run: ./scripts/validate-release.sh "${RELEASE_VERSION}" --verify-upstream
 
-      - name: Ensure version tags do not already exist
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.force_overwrite != true }}
+      - name: Ensure immutable version tags do not exist
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
           set -euo pipefail
           for image in "${REGISTRY_IMAGE}" "${GHCR_IMAGE}"; do
             if inspect_output="$(docker buildx imagetools inspect "${image}:${RELEASE_VERSION}" 2>&1)"; then
-              echo "::error::${image}:${RELEASE_VERSION} already exists; release tags are immutable."
+              echo "::error::${image}:${RELEASE_VERSION} already exists; CalVer release tags are immutable."
               exit 1
             fi
             if ! grep -Eqi 'manifest unknown|not found' <<< "${inspect_output}"; then
@@ -107,19 +117,19 @@ jobs:
       matrix:
         include:
           - platform: linux/amd64
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
             qemu: false
           - platform: linux/arm64
-            runner: ubuntu-26.04-arm
+            runner: ubuntu-24.04-arm
             qemu: false
           - platform: linux/arm/v7
-            runner: ubuntu-26.04-arm
+            runner: ubuntu-24.04-arm
             qemu: true
           - platform: linux/arm/v6
-            runner: ubuntu-26.04-arm
+            runner: ubuntu-24.04-arm
             qemu: true
           - platform: linux/arm/v5
-            runner: ubuntu-26.04-arm
+            runner: ubuntu-24.04-arm
             qemu: true
     steps:
       - name: Prepare platform pair
@@ -129,6 +139,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up QEMU
         if: ${{ matrix.qemu }}
@@ -150,51 +162,37 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push to Docker Hub by digest
-        id: build-dockerhub
+      - name: Build once and push to both registries by digest
+        id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           platforms: ${{ matrix.platform }}
-          provenance: false
-          sbom: false
+          provenance: mode=max
+          sbom: true
+          build-args: |
+            IMAGE_VERSION=${{ needs.preflight.outputs.version }}
+            IMAGE_REVISION=${{ needs.preflight.outputs.source_sha }}
           cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
           cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
-          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          outputs: >-
+            type=image,"name=${{ env.REGISTRY_IMAGE }},${{ env.GHCR_IMAGE }}",push-by-digest=true,name-canonical=true,push=true
 
-      - name: Build and push to GHCR by digest
-        id: build-ghcr
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: .
-          platforms: ${{ matrix.platform }}
-          provenance: false
-          sbom: false
-          cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
-          outputs: type=image,name=${{ env.GHCR_IMAGE }},push-by-digest=true,name-canonical=true,push=true
-
-      - name: Export digests
+      - name: Export and verify registry digests
         env:
-          DOCKERHUB_DIGEST: ${{ steps.build-dockerhub.outputs.digest }}
-          GHCR_DIGEST: ${{ steps.build-ghcr.outputs.digest }}
+          PLATFORM_DIGEST: ${{ steps.build.outputs.digest }}
         run: |
           set -euo pipefail
-          digest_pattern='^sha256:[0-9a-f]{64}$'
-          if [[ ! "${DOCKERHUB_DIGEST}" =~ ${digest_pattern} ]]; then
-            echo "::error::Invalid Docker Hub digest: ${DOCKERHUB_DIGEST}"
+          if [[ ! "${PLATFORM_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Invalid platform digest: ${PLATFORM_DIGEST}"
             exit 1
           fi
-          if [[ ! "${GHCR_DIGEST}" =~ ${digest_pattern} ]]; then
-            echo "::error::Invalid GHCR digest: ${GHCR_DIGEST}"
-            exit 1
-          fi
-          if [[ "${DOCKERHUB_DIGEST}" != "${GHCR_DIGEST}" ]]; then
-            echo "::error::Registry builds differ for ${PLATFORM_PAIR}: ${DOCKERHUB_DIGEST} != ${GHCR_DIGEST}"
-            exit 1
-          fi
+          for image in "${REGISTRY_IMAGE}" "${GHCR_IMAGE}"; do
+            docker buildx imagetools inspect "${image}@${PLATFORM_DIGEST}" >/dev/null
+          done
           mkdir -p /tmp/digests/dockerhub /tmp/digests/ghcr
-          touch "/tmp/digests/dockerhub/${DOCKERHUB_DIGEST#sha256:}"
-          touch "/tmp/digests/ghcr/${GHCR_DIGEST#sha256:}"
+          touch "/tmp/digests/dockerhub/${PLATFORM_DIGEST#sha256:}"
+          touch "/tmp/digests/ghcr/${PLATFORM_DIGEST#sha256:}"
 
       - name: Upload digests
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -204,17 +202,20 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  merge:
+  merge-sign:
     needs:
       - preflight
       - build
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    environment: release
+    timeout-minutes: 25
     permissions:
       contents: read
+      id-token: write
       packages: write
     env:
       RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+      SOURCE_SHA: ${{ needs.preflight.outputs.source_sha }}
     steps:
       - name: Download digests
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -225,6 +226,9 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
 
       - name: Login to Docker Hub
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -264,23 +268,97 @@ jobs:
             done
 
             docker buildx imagetools create \
-              -t "${image}:${RELEASE_VERSION}" \
+              --annotation "index:org.opencontainers.image.version=${RELEASE_VERSION}" \
+              --annotation "index:org.opencontainers.image.revision=${SOURCE_SHA}" \
+              --annotation "index:org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+              --annotation "index:org.opencontainers.image.licenses=Apache-2.0 AND GPL-2.0-or-later" \
+              --tag "${image}:${RELEASE_VERSION}" \
               "${sources[@]}"
           }
 
           create_version_manifest "${REGISTRY_IMAGE}" /tmp/digests/dockerhub
           create_version_manifest "${GHCR_IMAGE}" /tmp/digests/ghcr
 
-      - name: Verify versioned manifests
+      - name: Verify manifests, SBOM, and provenance
+        id: manifest
         run: |
           set -euo pipefail
+          expected_platforms=$'linux/amd64\nlinux/arm/v5\nlinux/arm/v6\nlinux/arm/v7\nlinux/arm64'
+          dockerhub_digest=""
+          ghcr_digest=""
+
+          verify_image() {
+            local image="$1"
+            local output_name="$2"
+            local raw
+            local platforms
+            local digest
+            local attestation_count
+            local sbom
+            local provenance
+
+            raw="$(docker buildx imagetools inspect --raw "${image}:${RELEASE_VERSION}")"
+            platforms="$(
+              jq -r '
+                .manifests[]
+                | select(.platform.os != "unknown" and .platform.architecture != "unknown")
+                | "\(.platform.os)/\(.platform.architecture)\(if .platform.variant then "/" + .platform.variant else "" end)"
+              ' <<< "${raw}" | sort
+            )"
+            if [[ "${platforms}" != "${expected_platforms}" ]]; then
+              echo "::error::Unexpected runtime platforms for ${image}:${RELEASE_VERSION}."
+              printf 'Expected:\n%s\nActual:\n%s\n' "${expected_platforms}" "${platforms}"
+              exit 1
+            fi
+
+            attestation_count="$(
+              jq '[.manifests[] | select(.annotations["vnd.docker.reference.type"] == "attestation-manifest")] | length' <<< "${raw}"
+            )"
+            if [[ "${attestation_count}" -ne 5 ]]; then
+              echo "::error::Expected one attestation manifest per runtime platform for ${image}, found ${attestation_count}."
+              exit 1
+            fi
+
+            sbom="$(docker buildx imagetools inspect "${image}:${RELEASE_VERSION}" --format '{{ json .SBOM }}')"
+            jq -e '(type == "object" or type == "array") and length > 0' <<< "${sbom}" >/dev/null
+            provenance="$(docker buildx imagetools inspect "${image}:${RELEASE_VERSION}" --format '{{ json .Provenance.SLSA }}')"
+            jq -e 'type == "object" and length > 0' <<< "${provenance}" >/dev/null
+
+            digest="sha256:$(printf '%s' "${raw}" | sha256sum | awk '{print $1}')"
+            printf -v "${output_name}" '%s' "${digest}"
+          }
+
+          verify_image "${REGISTRY_IMAGE}" dockerhub_digest
+          verify_image "${GHCR_IMAGE}" ghcr_digest
+          if [[ "${dockerhub_digest}" != "${ghcr_digest}" ]]; then
+            echo "::error::Registry manifest indexes differ: ${dockerhub_digest} != ${ghcr_digest}"
+            exit 1
+          fi
+          echo "digest=${dockerhub_digest}" >> "${GITHUB_OUTPUT}"
+
+      - name: Sign and verify immutable manifests
+        env:
+          MANIFEST_DIGEST: ${{ steps.manifest.outputs.digest }}
+        run: |
+          set -euo pipefail
+          certificate_identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yaml@${GITHUB_REF}"
           for image in "${REGISTRY_IMAGE}" "${GHCR_IMAGE}"; do
-            docker buildx imagetools inspect "${image}:${RELEASE_VERSION}"
+            cosign sign --yes "${image}@${MANIFEST_DIGEST}"
+            cosign verify \
+              --certificate-identity "${certificate_identity}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              "${image}@${MANIFEST_DIGEST}" >/dev/null
           done
 
-      - name: Inspect published version manifests
+      - name: Publish release summary
+        env:
+          MANIFEST_DIGEST: ${{ steps.manifest.outputs.digest }}
         run: |
-          set -euo pipefail
-          for image in "${REGISTRY_IMAGE}" "${GHCR_IMAGE}"; do
-            docker buildx imagetools inspect "${image}:${RELEASE_VERSION}"
-          done
+          {
+            echo "## ${RELEASE_VERSION}"
+            echo
+            echo "- Source: \`${SOURCE_SHA}\`"
+            echo "- Manifest: \`${MANIFEST_DIGEST}\`"
+            echo "- Platforms: amd64, arm64, arm/v7, arm/v6, arm/v5"
+            echo "- Evidence: SPDX SBOM, max-mode SLSA provenance, Sigstore keyless signature"
+          } >> "${GITHUB_STEP_SUMMARY}"

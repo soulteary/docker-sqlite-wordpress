@@ -76,13 +76,15 @@ Run the complete fast test set before opening a pull request:
 ```bash
 bash tests/test-entrypoint-reconcile.sh
 bash tests/test-validate-release.sh
+php tests/test-sqlite-local-core-update.php
 php tests/test-sqlite-select-id-key-fix.php
 php tests/test-tool-update-site-url.php
-./scripts/validate-release.sh 7.1.0
+./scripts/validate-release.sh 2026.08.30-r1
 ```
 
 CI additionally lints every PHP and shell file, runs ShellCheck and actionlint,
-and builds the amd64 image whenever packaged runtime files change. Changes to
+and smoke-tests amd64, native arm64, and the 32-bit ARM pure-PHP fallback when
+packaged runtime files change. Changes to
 `tool-update-site-url.php`, its entrypoint state handling, or its documentation
 must preserve these security properties:
 
@@ -124,6 +126,8 @@ docker exec -it <container> ls -l /var/www/html/wp-content/mu-plugins/
 ```
 
 - Whether the SQLite database integration plugin completes installation and can create, read, update, and delete posts normally.
+- Whether the bundled core package passes its SHA-256 check and the local core
+  update plugin redirects only the exact matching forward/reinstall offer.
 - Whether `/tool-update-site-url.php` is a 404 by default, accepts each
   documented credential mode when enabled, updates both options atomically, and
   becomes a 404 again immediately after one authenticated write attempt.
@@ -155,7 +159,15 @@ Please search for existing issues before opening a new one. When reporting a bug
 
 ## Versioning and Releases
 
-Releases are triggered by maintainers pushing a Git tag in the form `x.y.z`, which runs the single `Release` workflow under `.github/workflows/`. It publishes the same multi-arch image under both the immutable version tag and mutable `latest` tag to [Docker Hub](https://hub.docker.com/r/soulteary/sqlite-wordpress) and [GHCR](https://github.com/soulteary/docker-sqlite-wordpress/pkgs/container/sqlite-wordpress). Regular contributors do not need to run the release process manually; maintainers should follow [RELEASING.md](./RELEASING.md).
+Releases are triggered by maintainers pushing a protected annotated tag in the
+CalVer form `YYYY.MM.DD-rN`. The workflow publishes the same signed multi-arch
+manifest under an immutable exact tag to
+[Docker Hub](https://hub.docker.com/r/soulteary/sqlite-wordpress) and
+[GHCR](https://github.com/soulteary/docker-sqlite-wordpress/pkgs/container/sqlite-wordpress),
+then separately promotes the mutable date and `latest` aliases. Component
+versions remain independent. Regular contributors do not need to run the
+release process manually; see [VERSIONING.md](./VERSIONING.md) and maintainers'
+[RELEASING.md](./RELEASING.md).
 
 ---
 

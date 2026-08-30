@@ -9,7 +9,8 @@ This project packages the official [WordPress image](https://hub.docker.com/_/wo
 This policy covers issues **introduced by this project**, including:
 
 - The `Dockerfile`, `docker-entrypoint-sqlite.sh`, and the way the image is assembled and reconciled (build stages, permissions, bundled files, and persistent volumes).
-- The project-owned must-use loader, `sqlite-diagnostics.php`, and `sqlite-select-id-key-fix.php` components.
+- The project-owned must-use loader, `sqlite-diagnostics.php`,
+  `sqlite-select-id-key-fix.php`, and image-local core update components.
 - The disabled-by-default, credential-protected `/tool-update-site-url.php`
   recovery endpoint and its persistent throttle/one-shot state handling.
 - The packaging and configuration of the native `wp_mysql_parser` extension.
@@ -25,15 +26,22 @@ If you are unsure whether an issue belongs here or upstream, report it to us any
 
 ## Supported Versions
 
-Security fixes are applied to the latest released image tag only. Because image tags track the underlying WordPress and PHP versions, the most reliable way to stay secure is to run the newest tag.
+Security fixes are applied to the latest released image only. Image releases use
+CalVer independently from their WordPress, PHP, and SQLite Integration component
+versions; the most reliable way to stay secure is to move to the newest exact
+CalVer release after testing it.
 
 | Version         | Supported          |
 | --------------- | ------------------ |
 | Latest release  | :white_check_mark: |
 | Older releases  | :x:                |
 
-- `soulteary/sqlite-wordpress:latest` (Docker Hub) and `ghcr.io/soulteary/sqlite-wordpress:latest` (GHCR) always point to the most recent build.
-- Pinned version tags (e.g. `7.1.0`) are immutable snapshots and do **not** receive back-ported fixes. Upgrade to a newer tag to pick up security updates.
+- `soulteary/sqlite-wordpress:latest` (Docker Hub) and
+  `ghcr.io/soulteary/sqlite-wordpress:latest` (GHCR) point to the newest complete
+  release after cross-registry verification.
+- Exact CalVer tags (for example `2026.08.30-r1`) are immutable snapshots and do
+  **not** receive back-ported fixes. Upgrade to a newer tag to pick up security
+  updates. The date-only tag is mutable within that date.
 
 ## Reporting a Vulnerability
 
@@ -65,13 +73,19 @@ Please give us a reasonable amount of time to address the issue before any publi
 
 While not vulnerabilities in this image, the following practices reduce your exposure:
 
-- Always run the latest image tag and rebuild/pull regularly to receive updates.
+- Track the newest release, but pin its exact CalVer tag or manifest digest in
+  production. Verify its keyless signature, SBOM, and provenance as documented
+  in `RELEASING.md` before promotion.
 - Keep WordPress core, plugins, and themes updated from within the WordPress admin.
 - Protect the SQLite database file (mounted under `wp-content/database/`) with appropriate filesystem permissions and never expose it directly over the web.
 - Keep tested offline backups of the complete `wp-content/database/` directory.
   Stop the container before a filesystem copy so the main database and WAL
   sidecars are captured consistently; follow the README's safe backup and
   restore procedure instead of copying only the main SQLite file.
+- A whole `/var/www/html` mount keeps its previous WordPress core when the
+  container image changes. Back up the full site, recreate the container, and
+  run the standard WordPress updater to consume the matching checksummed local
+  core archive; do not assume a container restart upgraded persisted core.
 - Run the container behind a reverse proxy with TLS, and avoid exposing it directly to the public internet without hardening.
 - Use strong administrator credentials and limit access to the WordPress dashboard.
 - Leave the site URL recovery endpoint disabled except during a recovery. Use

@@ -61,8 +61,10 @@ jobs:
               scripts/validate-release.sh \
               sqlite-database-integration-loader.php \
               sqlite-diagnostics.php \
+              sqlite-local-core-update.php \
               sqlite-select-id-key-fix.php \
               tool-update-site-url.php \
+              tests/image-smoke.sh \
               tests/image-smoke-site-url.php; then
             image_changed=false
           fi
@@ -72,16 +74,13 @@ jobs:
         id: release
         run: |
           set -euo pipefail
-          mapfile -t release_versions < <(
-            sed -nE 's/^(ARG WORDPRESS_IMAGE=|FROM )wordpress:([0-9]+\.[0-9]+\.[0-9]+)-php[^[:space:]@]+-apache(@sha256:[0-9a-f]{64})?([[:space:]].*)?$/\2/p' Dockerfile \
-              | sort -u
-          )
-          if [[ "${#release_versions[@]}" -ne 1 ]]; then
-            echo "Expected one WordPress release version in Dockerfile." >&2
+          release_version="$(sed -nE 's/^ARG IMAGE_VERSION=([^[:space:]]+)$/\1/p' Dockerfile)"
+          if [[ -z "${release_version}" ]]; then
+            echo "Expected IMAGE_VERSION in Dockerfile." >&2
             exit 1
           fi
-          ./scripts/validate-release.sh "${release_versions[0]}"
-          echo "release_version=${release_versions[0]}" >> "${GITHUB_OUTPUT}"
+          ./scripts/validate-release.sh "${release_version}"
+          echo "release_version=${release_version}" >> "${GITHUB_OUTPUT}"
 
       - name: Lint shell scripts
         run: |
@@ -123,49 +122,61 @@ jobs:
   image-smoke:
     needs: validate
     if: needs.validate.outputs.image_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: amd64-native
+            runner: ubuntu-24.04
+            platform: linux/amd64
+            parser_mode: native
+            debian_arch: amd64
+            qemu: false
+          - name: arm64-native
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            parser_mode: native
+            debian_arch: arm64
+            qemu: false
+          - name: armv7-fallback
+            runner: ubuntu-24.04-arm
+            platform: linux/arm/v7
+            parser_mode: fallback
+            debian_arch: armhf
+            qemu: true
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Verify pinned WordPress base image
         run: ./scripts/validate-release.sh "${{ needs.validate.outputs.release_version }}" --verify-upstream
 
-      - name: Build amd64 image
-        run: docker build --pull --tag sqlite-wordpress:test .
+      - name: Set up QEMU
+        if: ${{ matrix.qemu }}
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Build ${{ matrix.name }} image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: sqlite-wordpress:test
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=ci-${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=ci-${{ matrix.name }}
 
       - name: Verify packaged runtime
-        run: |
-          set -euo pipefail
-          docker run --rm --entrypoint php sqlite-wordpress:test -m | grep -Fxq wp_mysql_parser
-          docker run --rm --entrypoint bash sqlite-wordpress:test -ceu '
-            test -f /usr/src/wordpress/wp-content/db.php
-            test -f /usr/src/wordpress/wp-content/mu-plugins/sqlite-database-integration/load.php
-            test -f /usr/src/wordpress/wp-content/mu-plugins/sqlite-database-integration-loader.php
-            test -f /usr/src/wordpress/wp-content/mu-plugins/sqlite-diagnostics.php
-            test -f /usr/src/wordpress/wp-content/mu-plugins/sqlite-select-id-key-fix.php
-            test -f /usr/src/wordpress/tool-update-site-url.php
-            php -l /usr/src/wordpress/wp-content/db.php
-            php -l /usr/src/wordpress/tool-update-site-url.php
-          '
-          # PHP variables below are intentionally protected from shell expansion.
-          # shellcheck disable=SC2016
-          docker run --rm sqlite-wordpress:test php -r '
-            require "/var/www/html/wp-load.php";
-            $driver = $GLOBALS["wpdb"]->get_driver();
-            foreach (["beginTransaction", "commit", "rollBack", "inTransaction"] as $method) {
-              if (!method_exists($driver, $method)) {
-                fwrite(STDERR, "SQLite driver transaction method unavailable: {$method}\n");
-                exit(1);
-              }
-            }
-            $driver->beginTransaction();
-            if (!$driver->inTransaction()) {
-              fwrite(STDERR, "SQLite driver did not enter a transaction.\n");
-              exit(1);
-            }
-            $driver->rollBack();
-          '
-          docker run --rm \
-            --volume "${PWD}/tests/image-smoke-site-url.php:/tmp/image-smoke-site-url.php:ro" \
-            sqlite-wordpress:test php /tmp/image-smoke-site-url.php
+        run: >-
+          ./tests/image-smoke.sh
+          sqlite-wordpress:test
+          ${{ matrix.platform }}
+          ${{ matrix.parser_mode }}
+          ${{ matrix.debian_arch }}

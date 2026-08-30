@@ -1,8 +1,8 @@
 services:
 
   wordpress:
-    image: soulteary/sqlite-wordpress:7.1.0
-    # or use: ghcr.io/soulteary/sqlite-wordpress:7.1.0
+    image: soulteary/sqlite-wordpress:2026.08.30-r1
+    # or use: ghcr.io/soulteary/sqlite-wordpress:2026.08.30-r1
     restart: always
     ports:
       # Safe local default. Replace 127.0.0.1 only when intentionally publishing
@@ -17,6 +17,10 @@ services:
       # `export WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true`
       WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED: "${WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED:-false}"
       WORDPRESS_SITE_URL_UPDATE_PASSWORD: "${WORDPRESS_SITE_URL_UPDATE_PASSWORD:-}"
+
+      # The matching checksummed WordPress core package is used by the normal
+      # updater by default. Set the exact value false to require remote packages.
+      WORDPRESS_LOCAL_CORE_UPDATE_ENABLED: "${WORDPRESS_LOCAL_CORE_UPDATE_ENABLED:-true}"
 
       # TOKEN_FILE is preferred for shared or internet-reachable hosts. Uncomment
       # this line and the service/top-level secrets blocks below. Leave PASSWORD
