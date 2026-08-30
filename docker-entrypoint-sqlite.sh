@@ -157,14 +157,18 @@ if [ -d "$src_content" ] && [ -d "$DOCROOT" ]; then
 			if [ "$managed_in_place" = true ]; then
 				if clear_managed_directory "$managed_dst" \
 					&& cp -a "$managed_tmp/." "$managed_dst/"; then
-					rm -rf -- "$managed_tmp" "$managed_previous"
+					# Removing the marker commits the live tree. Keep the backup
+					# recoverable until that commit record is gone.
 					rm -f -- "$managed_in_place_marker"
+					rm -rf -- "$managed_tmp" "$managed_previous"
 				else
 					echo >&2 "sqlite: in-place mu-plugin replacement failed; restoring previous contents"
 					if clear_managed_directory "$managed_dst" \
 						&& cp -a "$managed_previous/." "$managed_dst/"; then
-						rm -rf -- "$managed_previous"
+						# The restored tree becomes authoritative once the marker is
+						# removed; cleanup of its backup may safely resume on restart.
 						rm -f -- "$managed_in_place_marker"
+						rm -rf -- "$managed_previous"
 					else
 						echo >&2 "sqlite: rollback failed; saved contents remain at $managed_previous"
 					fi

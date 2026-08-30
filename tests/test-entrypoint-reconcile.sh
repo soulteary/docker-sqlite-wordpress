@@ -13,6 +13,8 @@ src_content="${prepare_dir}/wp-content"
 dst_content="${docroot}/wp-content"
 src_plugin="${src_content}/mu-plugins/sqlite-database-integration"
 dst_plugin="${dst_content}/mu-plugins/sqlite-database-integration"
+managed_previous="${dst_content}/mu-plugins/.sqlite-database-integration.previous"
+managed_marker="${managed_previous}.in-place"
 
 assert_no_reconcile_artifacts() {
 	test -z "$(
@@ -148,11 +150,80 @@ diff -qr "${src_plugin}" "${dst_plugin}"
 test -f "${dst_content}/mu-plugins/custom.php"
 assert_no_reconcile_artifacts
 
+# Emulate interruption immediately after the marker is removed but before its
+# recovery backup is deleted. The live copy is already complete, so the next
+# startup must treat it as authoritative and finish cleanup without requiring
+# manual removal of an invalid marker.
+real_rm="$(command -v rm)"
+cleanup_fail_file="${fixture_root}/cleanup-failed-once"
+# The generated wrapper must expand these variables when it runs, not while the
+# fixture is being written.
+# shellcheck disable=SC2016
+printf '%s\n' \
+	'#!/usr/bin/env bash' \
+	'set -Eeuo pipefail' \
+	'target="${SQLITE_TEST_RM_FAIL_PATH:-}"' \
+	'marker="${SQLITE_TEST_RM_MARKER_PATH:-}"' \
+	'fail_file="${SQLITE_TEST_RM_FAIL_ONCE_FILE:-}"' \
+	'matched=false' \
+	'filtered=()' \
+	'for argument in "$@"; do' \
+	'  if [ -n "${target}" ] && [ "${argument}" = "${target}" ]; then' \
+	'    matched=true' \
+	'  else' \
+	'    filtered+=("${argument}")' \
+	'  fi' \
+	'done' \
+	'if [ "${matched}" = true ] && [ ! -e "${marker}" ] && [ -e "${target}" ] && [ ! -e "${fail_file}" ]; then' \
+	'  "${SQLITE_TEST_REAL_RM}" "${filtered[@]}"' \
+	'  : > "${fail_file}"' \
+	'  exit 73' \
+	'fi' \
+	'exec "${SQLITE_TEST_REAL_RM}" "$@"' \
+	> "${stub_bin}/rm"
+chmod +x "${stub_bin}/rm"
+
+printf 'cleanup-order integration file\n' > "${src_plugin}/current.php"
+if PATH="${stub_bin}:${PATH}" \
+	SQLITE_TEST_MV_EBUSY_PATH="${dst_plugin}" \
+	SQLITE_TEST_REAL_MV="${real_mv}" \
+	SQLITE_TEST_RM_FAIL_PATH="${managed_previous}" \
+	SQLITE_TEST_RM_MARKER_PATH="${managed_marker}" \
+	SQLITE_TEST_RM_FAIL_ONCE_FILE="${cleanup_fail_file}" \
+	SQLITE_TEST_REAL_RM="${real_rm}" \
+	WORDPRESS_PREPARE_DIR="${prepare_dir}" \
+	WORDPRESS_DOCROOT="${docroot}" \
+	APACHE_RUN_USER="$(id -u)" \
+	APACHE_RUN_GROUP="$(id -g)" \
+	bash "${repo_root}/docker-entrypoint-sqlite.sh" true; then
+	echo "injected post-commit cleanup failure unexpectedly succeeded" >&2
+	exit 1
+fi
+test -f "${cleanup_fail_file}"
+test ! -e "${managed_marker}"
+test -d "${managed_previous}"
+diff -qr "${src_plugin}" "${dst_plugin}"
+
+PATH="${stub_bin}:${PATH}" \
+	SQLITE_TEST_MV_EBUSY_PATH="${dst_plugin}" \
+	SQLITE_TEST_REAL_MV="${real_mv}" \
+	SQLITE_TEST_RM_FAIL_PATH="${managed_previous}" \
+	SQLITE_TEST_RM_MARKER_PATH="${managed_marker}" \
+	SQLITE_TEST_RM_FAIL_ONCE_FILE="${cleanup_fail_file}" \
+	SQLITE_TEST_REAL_RM="${real_rm}" \
+	WORDPRESS_PREPARE_DIR="${prepare_dir}" \
+	WORDPRESS_DOCROOT="${docroot}" \
+	APACHE_RUN_USER="$(id -u)" \
+	APACHE_RUN_GROUP="$(id -g)" \
+	bash "${repo_root}/docker-entrypoint-sqlite.sh" true
+test ! -e "${managed_previous}"
+diff -qr "${src_plugin}" "${dst_plugin}"
+assert_no_reconcile_artifacts
+rm -f -- "${stub_bin}/rm"
+
 # Recover a process interruption during the in-place copy before comparing the
 # live tree with the packaged source. The artifact assertion uses a wildcard so
 # it checks the child entrypoint's unique staging name, not the parent's PID.
-managed_previous="${dst_content}/mu-plugins/.sqlite-database-integration.previous"
-managed_marker="${managed_previous}.in-place"
 mkdir "${managed_previous}"
 cp -a "${src_plugin}/." "${managed_previous}/"
 printf 'in-place\n' > "${managed_marker}"
