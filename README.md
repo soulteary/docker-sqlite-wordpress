@@ -397,13 +397,35 @@ upgrade, keeping backups and maintenance timing under deployment control.
 
 Do not copy only the main SQLite file while WordPress is running. Stop the
 container first so the database and its WAL sidecars form one consistent
-snapshot. For the repository's default `./wordpress` bind mount:
+snapshot. Run the archive helper as container root: the entrypoint makes the
+database and recovery state readable by `www-data`, so an unprivileged host
+user cannot reliably archive every file from a bind mount. The helper writes a
+temporary archive, verifies it, and only then publishes the final filename.
+
+For the repository's default `./wordpress` bind mount:
 
 ```bash
 mkdir -p backups
-backup_archive="backups/wordpress-database-$(date -u +%Y%m%dT%H%M%SZ).tar.gz"
-docker compose stop wordpress
-tar -C ./wordpress/wp-content -czf "${backup_archive}" database
+backup_name="wordpress-database-$(date -u +%Y%m%dT%H%M%SZ).tar.gz"
+docker compose stop wordpress &&
+docker run --rm --user 0:0 \
+  --entrypoint bash \
+  --mount type=bind,source="$(pwd)/wordpress",target=/source,readonly \
+  --mount type=bind,source="$(pwd)/backups",target=/backup \
+  --env "BACKUP_NAME=${backup_name}" \
+  soulteary/sqlite-wordpress:2026.08.30-r1 \
+  -Eeuo pipefail -c '
+    [[ -n "${BACKUP_NAME}" && "${BACKUP_NAME}" != */* ]]
+    archive="/backup/${BACKUP_NAME}"
+    temporary="${archive}.tmp.$$"
+    test ! -e "${archive}" && test ! -L "${archive}"
+    cleanup() { rm -f -- "${temporary}"; }
+    trap cleanup EXIT
+    tar -C /source/wp-content -czf "${temporary}" database
+    tar -tzf "${temporary}" >/dev/null
+    mv -- "${temporary}" "${archive}"
+    trap - EXIT
+  ' &&
 docker compose start wordpress
 ```
 
@@ -413,13 +435,26 @@ For a named volume, replace `<wordpress-volume>` with the volume mounted at
 ```bash
 mkdir -p backups
 wordpress_volume="replace-with-your-wordpress-volume-name"
-docker compose stop wordpress
-docker run --rm \
-  --entrypoint tar \
+backup_name="wordpress-database-$(date -u +%Y%m%dT%H%M%SZ).tar.gz"
+docker compose stop wordpress &&
+docker run --rm --user 0:0 \
+  --entrypoint bash \
   --mount "type=volume,source=${wordpress_volume},target=/source,readonly" \
   --mount type=bind,source="$(pwd)/backups",target=/backup \
+  --env "BACKUP_NAME=${backup_name}" \
   soulteary/sqlite-wordpress:2026.08.30-r1 \
-  -C /source/wp-content -czf /backup/wordpress-database.tar.gz database
+  -Eeuo pipefail -c '
+    [[ -n "${BACKUP_NAME}" && "${BACKUP_NAME}" != */* ]]
+    archive="/backup/${BACKUP_NAME}"
+    temporary="${archive}.tmp.$$"
+    test ! -e "${archive}" && test ! -L "${archive}"
+    cleanup() { rm -f -- "${temporary}"; }
+    trap cleanup EXIT
+    tar -C /source/wp-content -czf "${temporary}" database
+    tar -tzf "${temporary}" >/dev/null
+    mv -- "${temporary}" "${archive}"
+    trap - EXIT
+  ' &&
 docker compose start wordpress
 ```
 
@@ -427,10 +462,36 @@ Restore only while the container is stopped. Keep the current directory as a
 recoverable rollback copy instead of deleting it:
 
 ```bash
-backup_archive="backups/replace-with-your-backup.tar.gz"
-docker compose stop wordpress
-mv ./wordpress/wp-content/database ./wordpress/wp-content/database.before-restore
-tar -C ./wordpress/wp-content -xzf "${backup_archive}"
+backup_name="replace-with-your-backup.tar.gz"
+docker compose stop wordpress &&
+docker run --rm --user 0:0 \
+  --entrypoint bash \
+  --mount type=bind,source="$(pwd)/wordpress",target=/source \
+  --mount type=bind,source="$(pwd)/backups",target=/backup,readonly \
+  --env "BACKUP_NAME=${backup_name}" \
+  soulteary/sqlite-wordpress:2026.08.30-r1 \
+  -Eeuo pipefail -c '
+    [[ -n "${BACKUP_NAME}" && "${BACKUP_NAME}" != */* ]]
+    archive="/backup/${BACKUP_NAME}"
+    content=/source/wp-content
+    previous="${content}/database.before-restore"
+    test -s "${archive}"
+    tar -tzf "${archive}" >/dev/null
+    test ! -e "${previous}"
+    mv -- "${content}/database" "${previous}"
+    restored=false
+    rollback() {
+      if [[ "${restored}" != true ]]; then
+        rm -rf -- "${content}/database"
+        mv -- "${previous}" "${content}/database"
+      fi
+    }
+    trap rollback EXIT
+    tar -C "${content}" -xzf "${archive}"
+    test -d "${content}/database"
+    restored=true
+    trap - EXIT
+  ' &&
 docker compose up -d
 ```
 
@@ -439,15 +500,36 @@ rollback directory before extracting the archive:
 
 ```bash
 wordpress_volume="replace-with-your-wordpress-volume-name"
-docker compose stop wordpress
-docker run --rm \
+backup_name="replace-with-your-backup.tar.gz"
+docker compose stop wordpress &&
+docker run --rm --user 0:0 \
   --entrypoint bash \
   --mount "type=volume,source=${wordpress_volume},target=/source" \
   --mount type=bind,source="$(pwd)/backups",target=/backup,readonly \
+  --env "BACKUP_NAME=${backup_name}" \
   soulteary/sqlite-wordpress:2026.08.30-r1 \
-  -ceu 'test ! -e /source/wp-content/database.before-restore
-        mv /source/wp-content/database /source/wp-content/database.before-restore
-        tar -C /source/wp-content -xzf /backup/wordpress-database.tar.gz'
+  -Eeuo pipefail -c '
+    [[ -n "${BACKUP_NAME}" && "${BACKUP_NAME}" != */* ]]
+    archive="/backup/${BACKUP_NAME}"
+    content=/source/wp-content
+    previous="${content}/database.before-restore"
+    test -s "${archive}"
+    tar -tzf "${archive}" >/dev/null
+    test ! -e "${previous}"
+    mv -- "${content}/database" "${previous}"
+    restored=false
+    rollback() {
+      if [[ "${restored}" != true ]]; then
+        rm -rf -- "${content}/database"
+        mv -- "${previous}" "${content}/database"
+      fi
+    }
+    trap rollback EXIT
+    tar -C "${content}" -xzf "${archive}"
+    test -d "${content}/database"
+    restored=true
+    trap - EXIT
+  ' &&
 docker compose up -d
 ```
 
