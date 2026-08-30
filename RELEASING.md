@@ -39,7 +39,7 @@ authoritative control.
    php tests/test-sqlite-local-core-update.php
    php tests/test-sqlite-select-id-key-fix.php
    php tests/test-tool-update-site-url.php
-   ./scripts/validate-release.sh 2026.08.31-r2
+   ./scripts/validate-release.sh 2026.08.31-r3
    ```
 
 4. Let pull-request CI test amd64, native arm64, and the 32-bit ARM pure-PHP
@@ -57,17 +57,21 @@ Do not let the GitHub Release form create a lightweight tag.
 ```bash
 git switch main
 git pull --ff-only
-release=2026.08.31-r2
+release=2026.08.31-r3
 git tag -a "${release}" -m "Release ${release}"
 test "$(git cat-file -t "refs/tags/${release}")" = tag
 git push origin "refs/tags/${release}"
 ```
 
+The tag push is the publication trigger. Creating or publishing a GitHub
+Release does not trigger the image workflow. Confirm the tag-triggered run in
+the Actions page and do not start a second run while it is still active.
+
 The `Release` workflow builds each runtime platform once and publishes the same
 manifest digest to Docker Hub and GHCR under the immutable exact tag:
 
-- `soulteary/sqlite-wordpress:2026.08.31-r2`
-- `ghcr.io/soulteary/sqlite-wordpress:2026.08.31-r2`
+- `soulteary/sqlite-wordpress:2026.08.31-r3`
+- `ghcr.io/soulteary/sqlite-wordpress:2026.08.31-r3`
 
 BuildKit emits an SPDX SBOM and maximum-mode SLSA provenance for each platform.
 The merged index receives OCI version, source, revision, and license
@@ -82,7 +86,8 @@ If the newest Git tag is incomplete, promotion scans backward to the newest
 complete release rather than blocking all promotion.
 
 Manual `Release` dispatch is allowed only when the selected workflow ref is an
-unpublished annotated CalVer tag. Running it from a branch fails preflight.
+annotated CalVer tag. A fresh publication requires the exact image tag to be
+absent from both registries. Running it from a branch fails preflight.
 Manual `Promote latest` dispatch from `main` can reconcile mutable aliases.
 
 ### Recover from a failed preflight
@@ -95,12 +100,29 @@ increment the revision, and publish a new annotated protected tag. A workflow
 that stopped in preflight did not reach the image build or registry publication
 jobs.
 
+### Resume after manifest creation
+
+If a release creates the exact manifest in both registries and then fails during
+evidence verification or signing, do not start another fresh run. First confirm
+that both indexes have the same digest and their OCI version and revision match
+the protected source tag. Then open **Actions → Release → Run workflow**, select
+that exact tag, enable `resume_existing`, and run it. Resume mode skips platform
+builds and manifest creation; it revalidates every platform's SBOM and
+provenance, signs the existing digest, and verifies the signatures.
+
+Resume support must already exist in the workflow snapshot referenced by the
+tag. Earlier incomplete tags such as `2026.08.31-r2` cannot acquire this logic
+without moving the tag, so they remain incomplete and require a new revision.
+If only one registry contains the exact tag, the manifests differ, or their OCI
+revision does not match the tag commit, resume fails closed and a new revision
+is required.
+
 ## Verify and announce
 
 Set the exact tag once for all commands:
 
 ```bash
-release=2026.08.31-r2
+release=2026.08.31-r3
 ```
 
 1. Confirm both registries expose the same five runtime platforms, SBOM, and
@@ -110,7 +132,7 @@ release=2026.08.31-r2
    docker buildx imagetools inspect "soulteary/sqlite-wordpress:${release}"
    docker buildx imagetools inspect "ghcr.io/soulteary/sqlite-wordpress:${release}"
    docker buildx imagetools inspect "soulteary/sqlite-wordpress:${release}" --format '{{ json .SBOM }}'
-   docker buildx imagetools inspect "soulteary/sqlite-wordpress:${release}" --format '{{ json .Provenance.SLSA }}'
+   docker buildx imagetools inspect "soulteary/sqlite-wordpress:${release}" --format '{{ json .Provenance }}'
    ```
 
 2. Verify the keyless signatures with the workflow identity and GitHub OIDC
@@ -147,6 +169,7 @@ release=2026.08.31-r2
    Git tag exists and Docker Hub and GHCR expose the same manifest digest.
 
 Never force-push, delete, or retarget a published release tag. If anything in
-the image or its evidence must change, publish a new CalVer revision. A failed
-job may be rerun for the same tag only when it has not partially published a
-conflicting exact tag; otherwise diagnose and release a new revision.
+the image or its evidence must change, publish a new CalVer revision. Rerun a
+failed job directly when its original artifacts remain available; otherwise use
+the explicit resume mode only for matching complete manifests in both
+registries. Any conflicting or one-sided state requires a new revision.

@@ -5,6 +5,12 @@ on:
     tags:
       - "[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]-r[0-9]*"
   workflow_dispatch:
+    inputs:
+      resume_existing:
+        description: Validate and sign manifests already created by this release
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: release-${{ github.ref }}
@@ -24,6 +30,7 @@ jobs:
     outputs:
       version: ${{ steps.release.outputs.version }}
       source_sha: ${{ steps.release.outputs.source_sha }}
+      resume_existing: ${{ steps.registry.outputs.resume_existing }}
     steps:
       - name: Checkout protected release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -88,16 +95,27 @@ jobs:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: ./scripts/validate-release.sh "${RELEASE_VERSION}" --verify-upstream
 
-      - name: Ensure immutable version tags do not exist
+      - name: Select fresh or resumable publication
+        id: registry
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
+          RESUME_REQUESTED: ${{ github.event_name == 'workflow_dispatch' && inputs.resume_existing }}
         run: |
           set -euo pipefail
+          declare -A manifest_json=()
+          declare -A manifest_digest=()
+          existing_count=0
+
           for image in "${REGISTRY_IMAGE}" "${GHCR_IMAGE}"; do
-            if inspect_output="$(docker buildx imagetools inspect "${image}:${RELEASE_VERSION}" 2>&1)"; then
-              echo "::error::${image}:${RELEASE_VERSION} already exists; CalVer release tags are immutable."
-              exit 1
+            if raw="$(docker buildx imagetools inspect --raw "${image}:${RELEASE_VERSION}" 2>/tmp/inspect-error)"; then
+              manifest_json["${image}"]="${raw}"
+              manifest_digest["${image}"]="sha256:$(printf '%s' "${raw}" | sha256sum | awk '{print $1}')"
+              existing_count=$((existing_count + 1))
+              continue
             fi
+
+            inspect_output="$(</tmp/inspect-error)"
             if ! grep -Eqi 'manifest unknown|not found' <<< "${inspect_output}"; then
               echo "::error::Unable to verify that ${image}:${RELEASE_VERSION} is unused."
               printf '%s\n' "${inspect_output}"
@@ -105,8 +123,47 @@ jobs:
             fi
           done
 
+          if [[ "${RESUME_REQUESTED}" == "true" ]]; then
+            if [[ "${existing_count}" -ne 2 ]]; then
+              echo "::error::Resume requires the exact manifest to exist in both registries; found ${existing_count} of 2."
+              exit 1
+            fi
+
+            for image in "${REGISTRY_IMAGE}" "${GHCR_IMAGE}"; do
+              if ! jq -e \
+                --arg version "${RELEASE_VERSION}" \
+                --arg revision "${SOURCE_SHA}" \
+                --arg source "https://github.com/${GITHUB_REPOSITORY}" \
+                --arg licenses "Apache-2.0 AND GPL-2.0-or-later" \
+                '.schemaVersion == 2
+                 and .annotations["org.opencontainers.image.version"] == $version
+                 and .annotations["org.opencontainers.image.revision"] == $revision
+                 and .annotations["org.opencontainers.image.source"] == $source
+                 and .annotations["org.opencontainers.image.licenses"] == $licenses' \
+                <<< "${manifest_json["${image}"]}" >/dev/null; then
+                echo "::error::${image}:${RELEASE_VERSION} does not belong to source ${SOURCE_SHA}."
+                exit 1
+              fi
+            done
+
+            if [[ "${manifest_digest["${REGISTRY_IMAGE}"]}" != "${manifest_digest["${GHCR_IMAGE}"]}" ]]; then
+              echo "::error::Existing registry manifests do not have the same digest."
+              exit 1
+            fi
+            echo "resume_existing=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          if [[ "${existing_count}" -ne 0 ]]; then
+            echo "::error::${RELEASE_VERSION} already exists in ${existing_count} registry/registries; CalVer release tags are immutable."
+            echo "::error::Dispatch this protected tag with resume_existing enabled only to validate and sign an interrupted matching release."
+            exit 1
+          fi
+          echo "resume_existing=false" >> "${GITHUB_OUTPUT}"
+
   build:
     needs: preflight
+    if: needs.preflight.outputs.resume_existing != 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     permissions:
@@ -206,6 +263,10 @@ jobs:
     needs:
       - preflight
       - build
+    if: >-
+      always() &&
+      needs.preflight.result == 'success' &&
+      (needs.build.result == 'success' || needs.preflight.outputs.resume_existing == 'true')
     runs-on: ubuntu-24.04
     environment: release
     timeout-minutes: 25
@@ -216,8 +277,15 @@ jobs:
     env:
       RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
       SOURCE_SHA: ${{ needs.preflight.outputs.source_sha }}
+      RESUME_EXISTING: ${{ needs.preflight.outputs.resume_existing }}
     steps:
+      - name: Checkout release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Download digests
+        if: env.RESUME_EXISTING != 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: /tmp/digests
@@ -244,6 +312,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create versioned manifests
+        if: env.RESUME_EXISTING != 'true'
         run: |
           set -euo pipefail
 
@@ -296,8 +365,23 @@ jobs:
             local attestation_count
             local sbom
             local provenance
+            local expected_evidence_platforms
 
             raw="$(docker buildx imagetools inspect --raw "${image}:${RELEASE_VERSION}")"
+            if ! jq -e \
+              --arg version "${RELEASE_VERSION}" \
+              --arg revision "${SOURCE_SHA}" \
+              --arg source "https://github.com/${GITHUB_REPOSITORY}" \
+              --arg licenses "Apache-2.0 AND GPL-2.0-or-later" \
+              '.schemaVersion == 2
+               and .annotations["org.opencontainers.image.version"] == $version
+               and .annotations["org.opencontainers.image.revision"] == $revision
+               and .annotations["org.opencontainers.image.source"] == $source
+               and .annotations["org.opencontainers.image.licenses"] == $licenses' \
+              <<< "${raw}" >/dev/null; then
+              echo "::error::Unexpected OCI release annotations for ${image}:${RELEASE_VERSION}."
+              exit 1
+            fi
             platforms="$(
               jq -r '
                 .manifests[]
@@ -319,10 +403,19 @@ jobs:
               exit 1
             fi
 
+            expected_evidence_platforms="$(
+              jq -Rsc 'split("\n") | map(select(length > 0))' <<< "${expected_platforms}"
+            )"
             sbom="$(docker buildx imagetools inspect "${image}:${RELEASE_VERSION}" --format '{{ json .SBOM }}')"
-            jq -e '(type == "object" or type == "array") and length > 0' <<< "${sbom}" >/dev/null
-            provenance="$(docker buildx imagetools inspect "${image}:${RELEASE_VERSION}" --format '{{ json .Provenance.SLSA }}')"
-            jq -e 'type == "object" and length > 0' <<< "${provenance}" >/dev/null
+            if ! bash ./scripts/validate-buildx-evidence.sh SPDX "${expected_evidence_platforms}" <<< "${sbom}"; then
+              echo "::error::Incomplete per-platform SPDX SBOM for ${image}:${RELEASE_VERSION}."
+              exit 1
+            fi
+            provenance="$(docker buildx imagetools inspect "${image}:${RELEASE_VERSION}" --format '{{ json .Provenance }}')"
+            if ! bash ./scripts/validate-buildx-evidence.sh SLSA "${expected_evidence_platforms}" <<< "${provenance}"; then
+              echo "::error::Incomplete per-platform SLSA provenance for ${image}:${RELEASE_VERSION}."
+              exit 1
+            fi
 
             digest="sha256:$(printf '%s' "${raw}" | sha256sum | awk '{print $1}')"
             printf -v "${output_name}" '%s' "${digest}"

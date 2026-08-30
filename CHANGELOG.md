@@ -2,7 +2,34 @@
 
 ## [Unreleased]
 
+## [2026.08.31-r3] - 2026-08-31
+
+### Fixed
+
+- Corrected multi-platform Buildx evidence inspection to read the platform map
+  from `.Provenance` before validating each `SLSA` object. The previous
+  `.Provenance.SLSA` template failed after publishing the final `r2` indexes.
+- Require one non-empty SPDX SBOM and SLSA provenance object for every runtime
+  platform, with regression tests for missing platforms and empty evidence.
+- Added an explicit resumable publication mode. If both immutable registry
+  manifests already exist with the expected source, version, and matching
+  digest, a manual tag dispatch can skip rebuilding and finish verification and
+  signing without overwriting them.
+
+### Release status
+
+- `2026.08.31-r2` remains an incomplete, unsigned release and was not promoted.
+  This revision is the next publishable CalVer candidate.
+
 ## [2026.08.31-r2] - 2026-08-31
+
+### Release status
+
+- The tag push built all five platforms and created matching Docker Hub and
+  GHCR indexes at
+  `sha256:5b8f17f86f88887f0ad765030ee564317ba7ae3dde09b97685eaf230c696a18c`.
+  Multi-platform provenance verification then failed before signing, so this
+  exact tag is retained for audit but must not be deployed or promoted.
 
 ### Fixed
 
@@ -106,7 +133,8 @@
 - SQLite Database Integration 3.0.0 uses WAL journaling by default; keep the database, `-wal`, and `-shm` files on the same persistent volume.
 - The native `wp_mysql_parser` extension is built for amd64 and arm64. Other published platforms use the integration's pure-PHP parser fallback.
 
-[Unreleased]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.08.31-r2...HEAD
+[Unreleased]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.08.31-r3...HEAD
+[2026.08.31-r3]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.08.31-r2...2026.08.31-r3
 [2026.08.31-r2]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.08.31-r1...2026.08.31-r2
 [2026.08.31-r1]: https://github.com/soulteary/docker-sqlite-wordpress/compare/7.1.0...2026.08.31-r1
 [7.1.0]: https://github.com/soulteary/docker-sqlite-wordpress/compare/7.0.2-plugin-v3.0.0-rc.8...7.1.0
