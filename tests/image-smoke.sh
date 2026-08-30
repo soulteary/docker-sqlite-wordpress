@@ -65,13 +65,14 @@ package_copy="$(mktemp)"
 container_id="$(docker create --platform "${platform}" "${image}")"
 cleanup() {
 	docker rm -f "${container_id}" >/dev/null 2>&1 || true
-	rm -f "${package_copy}"
+	rm -f "${package_copy}" "${package_copy}.files"
 }
 trap cleanup EXIT
 docker cp "${container_id}:${core_package}" "${package_copy}"
-unzip -Z1 "${package_copy}" | grep -Fxq 'wordpress/wp-admin/includes/update-core.php'
-unzip -Z1 "${package_copy}" | grep -Fxq 'wordpress/wp-includes/version.php'
-if unzip -Z1 "${package_copy}" | grep -q '^wordpress/wp-content/'; then
+unzip -Z1 "${package_copy}" > "${package_copy}.files"
+grep -Fxq 'wordpress/wp-admin/includes/update-core.php' "${package_copy}.files"
+grep -Fxq 'wordpress/wp-includes/version.php' "${package_copy}.files"
+if grep -q '^wordpress/wp-content/' "${package_copy}.files"; then
 	echo "bundled core archive unexpectedly contains wp-content" >&2
 	exit 1
 fi

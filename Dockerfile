@@ -38,13 +38,15 @@ RUN package_root="$(mktemp -d)" && \
     find "${package_root}/wordpress" -exec touch -h -d '1980-01-01 00:00:00 UTC' {} + && \
     (cd "${package_root}" && zip -X -9 -q -r /wordpress-core-no-content.zip wordpress) && \
     test -s /wordpress-core-no-content.zip && \
-    unzip -Z1 /wordpress-core-no-content.zip | grep -Fxq 'wordpress/wp-admin/includes/update-core.php' && \
-    unzip -Z1 /wordpress-core-no-content.zip | grep -Fxq 'wordpress/wp-includes/version.php' && \
-    if unzip -Z1 /wordpress-core-no-content.zip | grep -q '^wordpress/wp-content/'; then \
+    unzip -Z1 /wordpress-core-no-content.zip > /wordpress-core-no-content.files && \
+    grep -Fxq 'wordpress/wp-admin/includes/update-core.php' /wordpress-core-no-content.files && \
+    grep -Fxq 'wordpress/wp-includes/version.php' /wordpress-core-no-content.files && \
+    if grep -q '^wordpress/wp-content/' /wordpress-core-no-content.files; then \
       echo 'The local core update archive must not contain wp-content.' >&2; \
       exit 1; \
     fi && \
     sha256sum /wordpress-core-no-content.zip | awk '{print $1}' > /wordpress-core-no-content.zip.sha256 && \
+    rm -f /wordpress-core-no-content.files && \
     rm -rf "${package_root}"
 
 # The native `wp_mysql_parser` extension is an optional accelerator; the plugin
