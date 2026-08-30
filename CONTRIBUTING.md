@@ -102,7 +102,7 @@ bash tests/test-validate-release.sh
 php tests/test-sqlite-local-core-update.php
 php tests/test-sqlite-select-id-key-fix.php
 php tests/test-tool-update-site-url.php
-./scripts/validate-release.sh 2026.08.30-r1
+./scripts/validate-release.sh 2026.08.31-r2
 ```
 
 To reproduce the remaining lint and configuration checks:

@@ -2,7 +2,31 @@
 
 ## [Unreleased]
 
-## [2026.08.30-r1] - 2026-08-30
+## [2026.08.31-r2] - 2026-08-31
+
+### Fixed
+
+- Prepared a new immutable release revision after `2026.08.31-r1` stopped in
+  release preflight before any container image was built. The existing `r1`
+  tag and GitHub source release remain in place for audit history and are not
+  moved, deleted, or reused.
+- Aligned the image version, validation examples, deployment examples, and
+  release documentation on the same `2026.08.31-r2` candidate.
+
+### Release notes
+
+- This revision contains the CalVer, SQLite Database Integration 3.0.1,
+  persistent-volume core updater, supply-chain evidence, and ARM test changes
+  recorded in the retained `2026.08.31-r1` source release below.
+
+## [2026.08.31-r1] - 2026-08-31
+
+### Release status
+
+- The GitHub source release was created with a lightweight tag while its source
+  still declared `2026.08.30-r1`. The protected release workflow rejected it
+  during preflight and produced no container image for this exact tag. Do not
+  use `2026.08.31-r1` as a deployable image release.
 
 ### Added
 
@@ -82,6 +106,7 @@
 - SQLite Database Integration 3.0.0 uses WAL journaling by default; keep the database, `-wal`, and `-shm` files on the same persistent volume.
 - The native `wp_mysql_parser` extension is built for amd64 and arm64. Other published platforms use the integration's pure-PHP parser fallback.
 
-[Unreleased]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.08.30-r1...HEAD
-[2026.08.30-r1]: https://github.com/soulteary/docker-sqlite-wordpress/compare/7.1.0...2026.08.30-r1
+[Unreleased]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.08.31-r2...HEAD
+[2026.08.31-r2]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.08.31-r1...2026.08.31-r2
+[2026.08.31-r1]: https://github.com/soulteary/docker-sqlite-wordpress/compare/7.1.0...2026.08.31-r1
 [7.1.0]: https://github.com/soulteary/docker-sqlite-wordpress/compare/7.0.2-plugin-v3.0.0-rc.8...7.1.0

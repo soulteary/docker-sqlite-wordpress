@@ -14,7 +14,7 @@ Immutable releases use:
 YYYY.MM.DD-rN
 ```
 
-- `YYYY.MM.DD` is the release date in UTC.
+- `YYYY.MM.DD` is the project release date in `Asia/Shanghai` (UTC+08:00).
 - `rN` is a positive revision beginning at `r1`.
 - Leading zeroes are required for month and day.
 - The date must be a real calendar date.
@@ -22,16 +22,16 @@ YYYY.MM.DD-rN
 Examples:
 
 ```text
-2026.08.30-r1
-2026.08.30-r2
+2026.08.31-r1
+2026.08.31-r2
 2026.09.04-r1
 ```
 
-Use another revision on the same UTC date whenever any published image content
-or release evidence changes, including a WordPress or plugin update, a base
-image rebuild, project code, labels, SBOM/provenance, or a packaging fix. Start
-at `r1` again on a new date. Documentation-only changes do not require an image
-release.
+Use another revision on the same project release date whenever any published
+image content or release evidence changes, including a WordPress or plugin
+update, a base image rebuild, project code, labels, SBOM/provenance, or a
+packaging fix. Start at `r1` again on a new date. Documentation-only changes do
+not require an image release.
 
 The release date identifies when the artifact is prepared for publication; it
 does not claim that every bundled component was released on that date. Publish
@@ -41,8 +41,8 @@ late fixes under their actual release date, and never reuse or move a tag.
 
 | Tag | Example | Mutability | Intended use |
 | --- | --- | --- | --- |
-| Exact release | `2026.08.30-r1` | Immutable | Deployments, rollback, audit, and signatures |
-| Date alias | `2026.08.30` | Mutable within that date | Follow the newest revision published for one date |
+| Exact release | `2026.08.31-r2` | Immutable | Deployments, rollback, audit, and signatures |
+| Date alias | `2026.08.31` | Mutable within that date | Follow the newest revision published for one date |
 | Rolling alias | `latest` | Mutable | Follow the newest complete release |
 
 Production deployments should pin an exact release tag, or preferably its
