@@ -5,14 +5,14 @@
 WordPress with SQLite, ready to use out of the box.
 
 <!-- release-availability: pending -->
-> **Container release availability:** `2026.08.31-r2` is prepared but is not published yet
+> **Container release availability:** `2026.08.31-r3` is prepared but is not published yet
 > as a verified container image. The retained
-> [`2026.08.31-r1` source release](https://github.com/soulteary/docker-sqlite-wordpress/releases/tag/2026.08.31-r1)
-> failed release preflight before any image was built and must not be used as a
-> container release. Until the protected annotated `r2` tag succeeds in both
-> registries, build the current repository as shown in Quick Start; the
-> existing `latest` alias does not represent all features documented for
-> current `main`.
+> [`2026.08.31-r2` release](https://github.com/soulteary/docker-sqlite-wordpress/releases/tag/2026.08.31-r2)
+> contains matching five-platform registry indexes, but verification failed
+> before signing and promotion; it must not be used as a completed release.
+> Until the protected annotated `r3` tag succeeds in both registries, build the
+> current repository as shown in Quick Start; the existing `latest` alias does
+> not represent all features documented for current `main`.
 
 - Based on [official image](https://hub.docker.com/_/wordpress), Easier and more sustainable solution.
 - DockerHub Page: https://hub.docker.com/r/soulteary/sqlite-wordpress
@@ -61,7 +61,7 @@ docker exec -it <container> ls -l /var/www/html/wp-content/mu-plugins/
 
 ## Quick Start
 
-Until `2026.08.31-r2` is published, build current `main` locally:
+Until `2026.08.31-r3` is published, build current `main` locally:
 
 ```bash
 docker build -t sqlite-wordpress:main .
@@ -74,11 +74,11 @@ convenience or the immutable CalVer release for reproducible deployments:
 # Docker Hub: use latest
 docker pull soulteary/sqlite-wordpress
 # Docker Hub: use an immutable release
-docker pull soulteary/sqlite-wordpress:2026.08.31-r2
+docker pull soulteary/sqlite-wordpress:2026.08.31-r3
 # GHCR: use latest
 docker pull ghcr.io/soulteary/sqlite-wordpress:latest
 # GHCR: use an immutable release
-docker pull ghcr.io/soulteary/sqlite-wordpress:2026.08.31-r2
+docker pull ghcr.io/soulteary/sqlite-wordpress:2026.08.31-r3
 ```
 
 Launch the locally built image on port `8080`:
@@ -116,7 +116,7 @@ Use the quick 1-minute initial installation, enjoy.
 
 ## Image Versions and Supply-chain Evidence
 
-Image releases use CalVer such as `2026.08.31-r2`; WordPress and SQLite
+Image releases use CalVer such as `2026.08.31-r3`; WordPress and SQLite
 Integration keep their own component versions. Exact `YYYY.MM.DD-rN` tags are
 immutable, while the date-only tag and `latest` are verified mutable aliases.
 Pin an exact tag or manifest digest in production. See
@@ -222,7 +222,7 @@ chmod 600 secrets/site-url-update-token
 services:
 
   wordpress:
-    image: soulteary/sqlite-wordpress:2026.08.31-r2
+    image: soulteary/sqlite-wordpress:2026.08.31-r3
     ports:
       - 127.0.0.1:8080:80
     environment:
@@ -252,7 +252,7 @@ export WORDPRESS_SITE_URL_UPDATE_PASSWORD="$(openssl rand -base64 24)"
 services:
 
   wordpress:
-    image: soulteary/sqlite-wordpress:2026.08.31-r2
+    image: soulteary/sqlite-wordpress:2026.08.31-r3
     ports:
       - 127.0.0.1:8080:80
     environment:
@@ -280,7 +280,7 @@ docker run --rm -it \
   --volume "$(pwd)/secrets/site-url-update-token:/run/secrets/site-url-update-token:ro" \
   --env WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true \
   --env WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE=/run/secrets/site-url-update-token \
-  soulteary/sqlite-wordpress:2026.08.31-r2
+  soulteary/sqlite-wordpress:2026.08.31-r3
 ```
 
 For PASSWORD, export a fresh value and pass only the variable name so the shell
@@ -294,7 +294,7 @@ docker run --rm -it \
   --volume "$(pwd)/wordpress:/var/www/html" \
   --env WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true \
   --env WORDPRESS_SITE_URL_UPDATE_PASSWORD \
-  soulteary/sqlite-wordpress:2026.08.31-r2
+  soulteary/sqlite-wordpress:2026.08.31-r3
 ```
 
 After the update, stop this temporary container and start the normal deployment
@@ -433,7 +433,7 @@ docker run --rm --user 0:0 \
   --mount type=bind,source="$(pwd)/wordpress",target=/source,readonly \
   --mount type=bind,source="$(pwd)/backups",target=/backup \
   --env "BACKUP_NAME=${backup_name}" \
-  soulteary/sqlite-wordpress:2026.08.31-r2 \
+  soulteary/sqlite-wordpress:2026.08.31-r3 \
   -Eeuo pipefail -c '
     [[ -n "${BACKUP_NAME}" && "${BACKUP_NAME}" != */* ]]
     archive="/backup/${BACKUP_NAME}"
@@ -468,7 +468,7 @@ docker run --rm --user 0:0 \
   --mount "type=volume,source=${wordpress_volume},target=/source,readonly" \
   --mount type=bind,source="$(pwd)/backups",target=/backup \
   --env "BACKUP_NAME=${backup_name}" \
-  soulteary/sqlite-wordpress:2026.08.31-r2 \
+  soulteary/sqlite-wordpress:2026.08.31-r3 \
   -Eeuo pipefail -c '
     [[ -n "${BACKUP_NAME}" && "${BACKUP_NAME}" != */* ]]
     archive="/backup/${BACKUP_NAME}"
@@ -501,7 +501,7 @@ docker run --rm --user 0:0 \
   --mount type=bind,source="$(pwd)/wordpress",target=/source \
   --mount type=bind,source="$(pwd)/backups",target=/backup,readonly \
   --env "BACKUP_NAME=${backup_name}" \
-  soulteary/sqlite-wordpress:2026.08.31-r2 \
+  soulteary/sqlite-wordpress:2026.08.31-r3 \
   -Eeuo pipefail -c '
     [[ -n "${BACKUP_NAME}" && "${BACKUP_NAME}" != */* ]]
     archive="/backup/${BACKUP_NAME}"
@@ -539,7 +539,7 @@ docker run --rm --user 0:0 \
   --mount "type=volume,source=${wordpress_volume},target=/source" \
   --mount type=bind,source="$(pwd)/backups",target=/backup,readonly \
   --env "BACKUP_NAME=${backup_name}" \
-  soulteary/sqlite-wordpress:2026.08.31-r2 \
+  soulteary/sqlite-wordpress:2026.08.31-r3 \
   -Eeuo pipefail -c '
     [[ -n "${BACKUP_NAME}" && "${BACKUP_NAME}" != */* ]]
     archive="/backup/${BACKUP_NAME}"

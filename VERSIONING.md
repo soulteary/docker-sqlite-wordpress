@@ -24,6 +24,7 @@ Examples:
 ```text
 2026.08.31-r1
 2026.08.31-r2
+2026.08.31-r3
 2026.09.04-r1
 ```
 
@@ -41,7 +42,7 @@ late fixes under their actual release date, and never reuse or move a tag.
 
 | Tag | Example | Mutability | Intended use |
 | --- | --- | --- | --- |
-| Exact release | `2026.08.31-r2` | Immutable | Deployments, rollback, audit, and signatures |
+| Exact release | `2026.08.31-r3` | Immutable | Deployments, rollback, audit, and signatures |
 | Date alias | `2026.08.31` | Mutable within that date | Follow the newest revision published for one date |
 | Rolling alias | `latest` | Mutable | Follow the newest complete release |
 
