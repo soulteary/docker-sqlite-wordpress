@@ -1,14 +1,18 @@
 # plugin: https://github.com/WordPress/sqlite-database-integration
 # The optional native Rust extension `wp_mysql_parser` accelerates the MySQL
 # lexer/parser used by the SQLite driver. It requires the 3.0 monorepo layout.
+ARG IMAGE_VERSION=2026.08.30-r1
+ARG IMAGE_REVISION=unknown
+ARG WORDPRESS_VERSION=7.1.0
 ARG WORDPRESS_IMAGE=wordpress:7.1.0-php8.5-apache@sha256:6c56ffb8cc06577c604707e3164f7fe736a3db6855336804a2cd4d7c186d6502
-ARG SQLITE_DATABASE_INTEGRATION_VERSION=3.0.0
-ARG SQLITE_DATABASE_INTEGRATION_COMMIT=8063adb20deb6d4e4736113c5e0e3fa0b03ccea0
+ARG SQLITE_DATABASE_INTEGRATION_VERSION=3.0.1
+ARG SQLITE_DATABASE_INTEGRATION_COMMIT=abf0dac137cf4e17866fea44b8a83d68b43792c4
 ARG RUSTUP_VERSION=1.29.0
 ARG RUST_TOOLCHAIN_VERSION=1.98.0
 
 # ---------- Stage 1: build the native Rust extension + resolve plugin symlink ----------
 FROM ${WORDPRESS_IMAGE} AS ext-builder
+ARG WORDPRESS_VERSION
 ARG SQLITE_DATABASE_INTEGRATION_VERSION
 ARG SQLITE_DATABASE_INTEGRATION_COMMIT
 ARG RUSTUP_VERSION
@@ -20,8 +24,28 @@ ARG TARGETARCH
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      curl ca-certificates build-essential pkg-config clang libclang-dev git \
+      curl ca-certificates build-essential pkg-config clang libclang-dev git zip unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# Build a deterministic no-content WordPress core archive from the exact pinned
+# base image. Existing full-docroot volumes can use WordPress's normal updater
+# without downloading a second, potentially different core package. User
+# plugins, themes, uploads, and SQLite data are deliberately excluded.
+RUN package_root="$(mktemp -d)" && \
+    mkdir -p "${package_root}/wordpress" && \
+    cp -a /usr/src/wordpress/. "${package_root}/wordpress/" && \
+    rm -rf "${package_root}/wordpress/wp-content" && \
+    find "${package_root}/wordpress" -exec touch -h -d '1980-01-01 00:00:00 UTC' {} + && \
+    (cd "${package_root}" && zip -X -9 -q -r /wordpress-core-no-content.zip wordpress) && \
+    test -s /wordpress-core-no-content.zip && \
+    unzip -Z1 /wordpress-core-no-content.zip | grep -Fxq 'wordpress/wp-admin/includes/update-core.php' && \
+    unzip -Z1 /wordpress-core-no-content.zip | grep -Fxq 'wordpress/wp-includes/version.php' && \
+    if unzip -Z1 /wordpress-core-no-content.zip | grep -q '^wordpress/wp-content/'; then \
+      echo 'The local core update archive must not contain wp-content.' >&2; \
+      exit 1; \
+    fi && \
+    sha256sum /wordpress-core-no-content.zip | awk '{print $1}' > /wordpress-core-no-content.zip.sha256 && \
+    rm -rf "${package_root}"
 
 # The native `wp_mysql_parser` extension is an optional accelerator; the plugin
 # transparently falls back to its pure-PHP parser when the .so is absent. On
@@ -76,13 +100,21 @@ RUN git init /src && \
 
 # ---------- Stage 2: final WordPress + SQLite runtime image ----------
 FROM ${WORDPRESS_IMAGE}
+ARG IMAGE_VERSION
+ARG IMAGE_REVISION
+ARG WORDPRESS_VERSION
 ARG SQLITE_DATABASE_INTEGRATION_VERSION
 LABEL org.opencontainers.image.authors="soulteary@gmail.com" \
       org.opencontainers.image.source="https://github.com/soulteary/docker-sqlite-wordpress" \
       org.opencontainers.image.title="Docker SQLite WordPress" \
       org.opencontainers.image.description="WordPress with SQLite, ready to use out of the box" \
-      org.opencontainers.image.version="7.1.0" \
-      org.opencontainers.image.licenses="GPL-2.0-or-later AND MIT"
+      org.opencontainers.image.version="${IMAGE_VERSION}" \
+      org.opencontainers.image.revision="${IMAGE_REVISION}" \
+      org.opencontainers.image.licenses="Apache-2.0 AND GPL-2.0-or-later" \
+      org.opencontainers.image.base.name="docker.io/library/wordpress:7.1.0-php8.5-apache" \
+      org.opencontainers.image.base.digest="sha256:6c56ffb8cc06577c604707e3164f7fe736a3db6855336804a2cd4d7c186d6502" \
+      io.soulteary.wordpress.version="${WORDPRESS_VERSION}" \
+      io.soulteary.sqlite-integration.version="${SQLITE_DATABASE_INTEGRATION_VERSION}"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV WORDPRESS_PREPARE_DIR=/usr/src/wordpress
@@ -100,6 +132,14 @@ COPY sqlite-select-id-key-fix.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins
 # that surfaces the native parser / SQLite / environment / integration state.
 # Auto-loaded from the mu-plugins root and cannot be deactivated.
 COPY sqlite-diagnostics.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-diagnostics.php
+
+# WordPress's official entrypoint intentionally leaves an initialized docroot
+# untouched. Bundle the exact pinned core as a no-content archive and let this
+# MU plugin replace only matching WordPress.org update offers with a verified
+# temporary copy of that local package.
+COPY --from=ext-builder /wordpress-core-no-content.zip /usr/src/wordpress-upgrades/wordpress-${WORDPRESS_VERSION}-no-content.zip
+COPY --from=ext-builder /wordpress-core-no-content.zip.sha256 /usr/src/wordpress-upgrades/wordpress-${WORDPRESS_VERSION}-no-content.zip.sha256
+COPY sqlite-local-core-update.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-local-core-update.php
 
 # mu-plugins only auto-loads .php files in the mu-plugins root; it does NOT
 # recurse into subdirectories, so the plugin's own
@@ -133,7 +173,19 @@ RUN mv "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integrati
     touch "${WORDPRESS_PREPARE_DIR}/wp-content/database/.ht.sqlite" && \
     chown -R www-data:www-data "${WORDPRESS_PREPARE_DIR}/wp-content" && \
     find "${WORDPRESS_PREPARE_DIR}/wp-content" -type d -exec chmod 755 {} + && \
-    chmod 640 "${WORDPRESS_PREPARE_DIR}/wp-content/database/.ht.sqlite"
+    chmod 640 "${WORDPRESS_PREPARE_DIR}/wp-content/database/.ht.sqlite" && \
+    core_package="/usr/src/wordpress-upgrades/wordpress-${WORDPRESS_VERSION}-no-content.zip" && \
+    core_package_sha256="$(cat "${core_package}.sha256")" && \
+    test "$(printf '%s' "${core_package_sha256}" | wc -c)" -eq 64 && \
+    sed -i \
+      -e "s/{WORDPRESS_VERSION}/${WORDPRESS_VERSION}/g" \
+      -e "s/{WORDPRESS_CORE_PACKAGE_SHA256}/${core_package_sha256}/g" \
+      "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-local-core-update.php" && \
+    ! grep -Eq '\{WORDPRESS_(VERSION|CORE_PACKAGE_SHA256)\}' \
+      "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-local-core-update.php" && \
+    chown -R root:root /usr/src/wordpress-upgrades && \
+    chmod 0555 /usr/src/wordpress-upgrades && \
+    chmod 0444 /usr/src/wordpress-upgrades/*
 
 # Fail the build (instead of silently shipping a broken drop-in) if the upstream
 # layout changes: the SQLite loader must be present, its `../database` sibling
@@ -146,6 +198,8 @@ RUN mv "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integrati
 RUN test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration/wp-includes/sqlite/db.php" && \
     test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration/wp-includes/database/load.php" && \
     test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration/integrations/query-monitor/boot.php" && \
+    test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-local-core-update.php" && \
+    test -s "/usr/src/wordpress-upgrades/wordpress-${WORDPRESS_VERSION}-no-content.zip" && \
     test -f "${WORDPRESS_PREPARE_DIR}/tool-update-site-url.php" && \
     grep -q 'SQLITE_DB_DROPIN_VERSION' "${WORDPRESS_PREPARE_DIR}/wp-content/db.php" && \
     ! grep -q '{SQLITE_IMPLEMENTATION_FOLDER_PATH}' "${WORDPRESS_PREPARE_DIR}/wp-content/db.php"

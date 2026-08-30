@@ -39,6 +39,7 @@ printf 'removed upstream file\n' > "${dst_plugin}/stale.php"
 for managed_file in \
 	"sqlite-database-integration-loader.php" \
 	"sqlite-diagnostics.php" \
+	"sqlite-local-core-update.php" \
 	"sqlite-select-id-key-fix.php"
 do
 	printf 'new %s\n' "${managed_file}" > "${src_content}/mu-plugins/${managed_file}"
@@ -71,6 +72,7 @@ test -f "${dst_content}/mu-plugins/custom.php"
 for managed_file in \
 	"sqlite-database-integration-loader.php" \
 	"sqlite-diagnostics.php" \
+	"sqlite-local-core-update.php" \
 	"sqlite-select-id-key-fix.php"
 do
 	cmp "${src_content}/mu-plugins/${managed_file}" "${dst_content}/mu-plugins/${managed_file}"
