@@ -72,30 +72,114 @@ if [ -d "$src_content" ] && [ -d "$DOCROOT" ]; then
 	managed_plugin="sqlite-database-integration"
 	managed_src="$src_mu_plugins/$managed_plugin"
 	managed_dst="$dst_mu_plugins/$managed_plugin"
-	managed_tmp="$dst_mu_plugins/.${managed_plugin}.new.$$"
 	managed_previous="$dst_mu_plugins/.${managed_plugin}.previous"
+	managed_in_place_marker="${managed_previous}.in-place"
+
+	clear_managed_directory() {
+		find "$1" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+	}
 
 	if [ -d "$src_mu_plugins" ]; then
 		mkdir -p "$dst_mu_plugins"
 
-		# Recover a replacement interrupted after the old tree was moved aside.
-		if [ ! -e "$managed_dst" ] && [ ! -L "$managed_dst" ] && [ -e "$managed_previous" ]; then
-			mv "$managed_previous" "$managed_dst"
+		# An in-place replacement is used when the managed directory is itself a
+		# mount point and therefore cannot be renamed. Restore its saved contents
+		# before retrying if the previous container stopped during that operation.
+		if [ -e "$managed_in_place_marker" ] || [ -L "$managed_in_place_marker" ]; then
+			if [ -L "$managed_in_place_marker" ] \
+				|| [ ! -f "$managed_in_place_marker" ] \
+				|| [ ! -d "$managed_previous" ] \
+				|| [ -L "$managed_previous" ] \
+				|| [ ! -d "$managed_dst" ] \
+				|| [ -L "$managed_dst" ]; then
+				echo >&2 "sqlite: invalid interrupted in-place replacement state"
+				exit 1
+			fi
+			echo >&2 "sqlite: restoring interrupted in-place mu-plugin replacement"
+			if clear_managed_directory "$managed_dst" \
+				&& cp -a "$managed_previous/." "$managed_dst/"; then
+				rm -f -- "$managed_in_place_marker"
+				rm -rf -- "$managed_previous"
+			else
+				echo >&2 "sqlite: could not restore interrupted mu-plugin replacement"
+				exit 1
+			fi
 		fi
 
-		if [ -d "$managed_src" ] && { [ ! -d "$managed_dst" ] || ! diff -qr "$managed_src" "$managed_dst" >/dev/null 2>&1; }; then
-			echo >&2 "sqlite: replacing managed mu-plugin directory $managed_plugin"
-			rm -rf "$managed_tmp"
-			cp -a "$managed_src" "$managed_tmp"
-			rm -rf "$managed_previous"
-			if [ -e "$managed_dst" ] || [ -L "$managed_dst" ]; then
-				mv "$managed_dst" "$managed_previous"
-			fi
-			if mv "$managed_tmp" "$managed_dst"; then
-				rm -rf "$managed_previous"
+		# Recover a replacement interrupted after the old tree was moved aside.
+		if [ ! -e "$managed_dst" ] && [ ! -L "$managed_dst" ] && [ -e "$managed_previous" ]; then
+			if [ -d "$managed_previous" ] && [ ! -L "$managed_previous" ]; then
+				mv "$managed_previous" "$managed_dst"
 			else
-				rm -rf "$managed_tmp"
-				if [ -e "$managed_previous" ]; then
+				echo >&2 "sqlite: invalid interrupted mu-plugin replacement state"
+				exit 1
+			fi
+		elif { [ -e "$managed_dst" ] || [ -L "$managed_dst" ]; } \
+			&& { [ -e "$managed_previous" ] || [ -L "$managed_previous" ]; }; then
+			# The live rename completed but cleanup did not. The live directory is
+			# authoritative because a normal rename is atomic.
+			rm -rf -- "$managed_previous"
+		fi
+
+		if [ -d "$managed_src" ] \
+			&& { [ -L "$managed_dst" ] || [ ! -d "$managed_dst" ] || ! diff -qr "$managed_src" "$managed_dst" >/dev/null 2>&1; }; then
+			echo >&2 "sqlite: replacing managed mu-plugin directory $managed_plugin"
+			managed_tmp="$(mktemp -d "$dst_mu_plugins/.${managed_plugin}.new.XXXXXX")"
+			cp -a "$managed_src/." "$managed_tmp/"
+			chmod --reference="$managed_src" "$managed_tmp"
+			rm -rf -- "$managed_previous"
+			rm -f -- "$managed_in_place_marker"
+			managed_in_place=false
+			managed_moved_previous=false
+			if [ -e "$managed_dst" ] || [ -L "$managed_dst" ]; then
+				if mv "$managed_dst" "$managed_previous"; then
+					managed_moved_previous=true
+				elif [ -d "$managed_dst" ] \
+					&& [ ! -L "$managed_dst" ] \
+					&& [ ! -e "$managed_previous" ] \
+					&& [ ! -L "$managed_previous" ]; then
+					echo >&2 "sqlite: managed mu-plugin directory cannot be renamed; reconciling it in place"
+					mkdir "$managed_previous"
+					if cp -a "$managed_dst/." "$managed_previous/"; then
+						: > "$managed_in_place_marker"
+						managed_in_place=true
+					else
+						rm -rf -- "$managed_tmp" "$managed_previous"
+						exit 1
+					fi
+				else
+					rm -rf -- "$managed_tmp"
+					echo >&2 "sqlite: could not move or safely reconcile managed mu-plugin directory"
+					exit 1
+				fi
+			fi
+
+			if [ "$managed_in_place" = true ]; then
+				if clear_managed_directory "$managed_dst" \
+					&& cp -a "$managed_tmp/." "$managed_dst/"; then
+					# Removing the marker commits the live tree. Keep the backup
+					# recoverable until that commit record is gone.
+					rm -f -- "$managed_in_place_marker"
+					rm -rf -- "$managed_tmp" "$managed_previous"
+				else
+					echo >&2 "sqlite: in-place mu-plugin replacement failed; restoring previous contents"
+					if clear_managed_directory "$managed_dst" \
+						&& cp -a "$managed_previous/." "$managed_dst/"; then
+						# The restored tree becomes authoritative once the marker is
+						# removed; cleanup of its backup may safely resume on restart.
+						rm -f -- "$managed_in_place_marker"
+						rm -rf -- "$managed_previous"
+					else
+						echo >&2 "sqlite: rollback failed; saved contents remain at $managed_previous"
+					fi
+					rm -rf -- "$managed_tmp"
+					exit 1
+				fi
+			elif mv "$managed_tmp" "$managed_dst"; then
+				rm -rf -- "$managed_previous"
+			else
+				rm -rf -- "$managed_tmp"
+				if [ "$managed_moved_previous" = true ] && [ -e "$managed_previous" ]; then
 					mv "$managed_previous" "$managed_dst"
 				fi
 				exit 1
