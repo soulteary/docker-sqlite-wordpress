@@ -24,8 +24,9 @@ authoritative control.
 
 ## Prepare
 
-1. Choose the UTC release date and revision. Use `r1` for the first release on
-   a date, then increment it for every changed image artifact or evidence set.
+1. Choose the `Asia/Shanghai` release date and revision. Use `r1` for the first
+   release on a date, then increment it for every changed image artifact or
+   evidence set.
    Check that the exact tag is absent from Git, Docker Hub, and GHCR.
 2. Update the pinned WordPress base digest, `WORDPRESS_VERSION`, SQLite
    Integration version/ref, README and Compose examples, and `CHANGELOG.md` in a
@@ -38,7 +39,7 @@ authoritative control.
    php tests/test-sqlite-local-core-update.php
    php tests/test-sqlite-select-id-key-fix.php
    php tests/test-tool-update-site-url.php
-   ./scripts/validate-release.sh 2026.08.30-r1
+   ./scripts/validate-release.sh 2026.08.31-r2
    ```
 
 4. Let pull-request CI test amd64, native arm64, and the 32-bit ARM pure-PHP
@@ -56,15 +57,17 @@ Do not let the GitHub Release form create a lightweight tag.
 ```bash
 git switch main
 git pull --ff-only
-git tag -a 2026.08.30-r1 -m "Release 2026.08.30-r1"
-git push origin refs/tags/2026.08.30-r1
+release=2026.08.31-r2
+git tag -a "${release}" -m "Release ${release}"
+test "$(git cat-file -t "refs/tags/${release}")" = tag
+git push origin "refs/tags/${release}"
 ```
 
 The `Release` workflow builds each runtime platform once and publishes the same
 manifest digest to Docker Hub and GHCR under the immutable exact tag:
 
-- `soulteary/sqlite-wordpress:2026.08.30-r1`
-- `ghcr.io/soulteary/sqlite-wordpress:2026.08.30-r1`
+- `soulteary/sqlite-wordpress:2026.08.31-r2`
+- `ghcr.io/soulteary/sqlite-wordpress:2026.08.31-r2`
 
 BuildKit emits an SPDX SBOM and maximum-mode SLSA provenance for each platform.
 The merged index receives OCI version, source, revision, and license
@@ -74,7 +77,7 @@ succeeds.
 
 Afterward, the serialized `Promote latest` workflow selects the numerically
 newest complete CalVer release whose two registry indexes match. It promotes
-both the date alias (for example `2026.08.30`) and `latest` without rebuilding.
+both the date alias (for example `2026.08.31`) and `latest` without rebuilding.
 If the newest Git tag is incomplete, promotion scans backward to the newest
 complete release rather than blocking all promotion.
 
@@ -82,12 +85,22 @@ Manual `Release` dispatch is allowed only when the selected workflow ref is an
 unpublished annotated CalVer tag. Running it from a branch fails preflight.
 Manual `Promote latest` dispatch from `main` can reconcile mutable aliases.
 
+### Recover from a failed preflight
+
+Do not move, delete, or reuse a public exact CalVer tag after a failed release.
+A rerun cannot turn a lightweight tag into an annotated tag or make a tag name
+match a different `IMAGE_VERSION`. Keep the failed tag and source release for
+audit history, correct the ruleset and source version through a pull request,
+increment the revision, and publish a new annotated protected tag. A workflow
+that stopped in preflight did not reach the image build or registry publication
+jobs.
+
 ## Verify and announce
 
 Set the exact tag once for all commands:
 
 ```bash
-release=2026.08.30-r1
+release=2026.08.31-r2
 ```
 
 1. Confirm both registries expose the same five runtime platforms, SBOM, and

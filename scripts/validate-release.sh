@@ -4,7 +4,7 @@ set -euo pipefail
 
 release_version="${1:-}"
 if [[ ! "${release_version}" =~ ^[0-9]{4}\.(0[1-9]|1[0-2])\.(0[1-9]|[12][0-9]|3[01])-r[1-9][0-9]*$ ]]; then
-	echo "release version must use YYYY.MM.DD-rN CalVer (for example, 2026.08.30-r1)" >&2
+	echo "release version must use YYYY.MM.DD-rN CalVer (for example, 2026.08.31-r2)" >&2
 	exit 1
 fi
 
