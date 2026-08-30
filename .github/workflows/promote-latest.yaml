@@ -133,9 +133,11 @@ jobs:
             exit 1
           fi
 
-          echo "version=${selected_version}" >> "${GITHUB_OUTPUT}"
-          echo "date=${selected_version%-r*}" >> "${GITHUB_OUTPUT}"
-          echo "digest=${selected_digest}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "version=${selected_version}"
+            echo "date=${selected_version%-r*}"
+            echo "digest=${selected_digest}"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Promote verified mutable aliases
         env:
