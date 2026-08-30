@@ -180,6 +180,10 @@ if grep -Fq '<!-- release-availability: pending -->' README.md; then
 		echo "pending release documentation must use the local main image" >&2
 		failures=$((failures + 1))
 	}
+	grep -Eq '^[[:space:]]+build:$' docker-compose.yml || {
+		echo "pending release documentation must build the current repository" >&2
+		failures=$((failures + 1))
+	}
 else
 	grep -Fq "image: soulteary/sqlite-wordpress:${release_version}" docker-compose.yml || {
 		echo "docker-compose.yml does not use image release ${release_version}" >&2
