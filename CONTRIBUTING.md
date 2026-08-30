@@ -56,18 +56,40 @@ Once started, visit `http://localhost:8080` to reach the WordPress setup wizard.
 
 ### Local Single-Arch Build
 
+Build and load the platform that matches your Docker host. Set
+`TARGET_PLATFORM` to `linux/amd64` or `linux/arm64` as appropriate. Selecting a
+different architecture requires emulation and does not test the native
+extension on your host architecture.
+
 ```bash
-docker build -t soulteary/sqlite-wordpress:dev .
-docker run --rm -it -p 8080:80 -v "$(pwd)/wordpress:/var/www/html" soulteary/sqlite-wordpress:dev
+TARGET_PLATFORM=linux/amd64
+docker buildx build \
+  --load \
+  --platform "${TARGET_PLATFORM}" \
+  --tag soulteary/sqlite-wordpress:dev \
+  .
+docker run --rm -it -p 127.0.0.1:8080:80 \
+  -v "$(pwd)/wordpress:/var/www/html" \
+  soulteary/sqlite-wordpress:dev
 ```
 
 ### Multi-Arch Build
 
 This project supports `linux/amd64`, `linux/arm64`, `linux/arm/v7`, `linux/arm/v6`, and `linux/arm/v5`. The native Rust extension is compiled only on `amd64` and `arm64`; the other 32-bit ARM platforms automatically skip it and fall back to the pure-PHP parser (see the comments in the `Dockerfile`).
 
+Buildx cannot load a multi-platform result into the classic local Docker image
+store. Export an OCI archive explicitly when checking the complete platform
+matrix locally:
+
 ```bash
-docker buildx build --platform linux/amd64,linux/arm64 -t soulteary/sqlite-wordpress:dev .
+docker buildx build \
+  --platform linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/arm/v5 \
+  --output type=oci,dest=/tmp/sqlite-wordpress-dev.oci \
+  .
 ```
+
+Use `--push` with an authorized test registry only when remote publication is
+intentional. Never push a release tag from a contributor build.
 
 ### Repository Tests
 
@@ -75,11 +97,26 @@ Run the complete fast test set before opening a pull request:
 
 ```bash
 bash tests/test-entrypoint-reconcile.sh
+bash tests/test-documentation.sh
 bash tests/test-validate-release.sh
 php tests/test-sqlite-local-core-update.php
 php tests/test-sqlite-select-id-key-fix.php
 php tests/test-tool-update-site-url.php
 ./scripts/validate-release.sh 2026.08.30-r1
+```
+
+To reproduce the remaining lint and configuration checks:
+
+```bash
+mapfile -d '' shell_files < <(find . -type f -name '*.sh' -print0)
+shellcheck "${shell_files[@]}"
+
+while IFS= read -r -d '' php_file; do
+  php -l "${php_file}"
+done < <(find . -type f -name '*.php' -print0)
+
+actionlint
+docker compose config --quiet
 ```
 
 CI additionally lints every PHP and shell file, runs ShellCheck and actionlint,
