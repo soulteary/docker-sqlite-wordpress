@@ -4,6 +4,13 @@
 
 WordPress with SQLite, ready to use out of the box.
 
+<!-- release-availability: pending -->
+> **Release availability:** `2026.08.30-r1` is prepared but is not published yet.
+> Commands below that use this exact tag become available only after the
+> protected tag workflow succeeds in both registries. Until then, build the
+> current repository as shown in Quick Start; the existing `latest` alias does
+> not represent all features documented for current `main`.
+
 - Based on [official image](https://hub.docker.com/_/wordpress), Easier and more sustainable solution.
 - DockerHub Page: https://hub.docker.com/r/soulteary/sqlite-wordpress
 - GHCR Page: https://github.com/soulteary/docker-sqlite-wordpress/pkgs/container/sqlite-wordpress
@@ -51,8 +58,14 @@ docker exec -it <container> ls -l /var/www/html/wp-content/mu-plugins/
 
 ## Quick Start
 
-Pull the rolling tag for convenience or an immutable CalVer release for
-reproducible deployments:
+Until `2026.08.30-r1` is published, build current `main` locally:
+
+```bash
+docker build -t sqlite-wordpress:main .
+```
+
+After the protected release workflow succeeds, pull the rolling tag for
+convenience or the immutable CalVer release for reproducible deployments:
 
 ```bash
 # Docker Hub: use latest
@@ -65,12 +78,12 @@ docker pull ghcr.io/soulteary/sqlite-wordpress:latest
 docker pull ghcr.io/soulteary/sqlite-wordpress:2026.08.30-r1
 ```
 
-Use the following command to quickly launch the wordpress with port `8080`:
+Launch the locally built image on port `8080`:
 
 ```bash
-docker run --rm -it -p 127.0.0.1:8080:80 -v "$(pwd)/wordpress:/var/www/html" soulteary/sqlite-wordpress
-# or use GHCR
-docker run --rm -it -p 127.0.0.1:8080:80 -v "$(pwd)/wordpress:/var/www/html" ghcr.io/soulteary/sqlite-wordpress:latest
+docker run --rm -it -p 127.0.0.1:8080:80 \
+  -v "$(pwd)/wordpress:/var/www/html" \
+  sqlite-wordpress:main
 ```
 
 You can also use docker compose to start wordpress:
@@ -79,8 +92,9 @@ You can also use docker compose to start wordpress:
 services:
 
   wordpress:
-    image: soulteary/sqlite-wordpress:latest
-    # or use: ghcr.io/soulteary/sqlite-wordpress:2026.08.30-r1
+    build:
+      context: .
+    image: sqlite-wordpress:main
     restart: always
     ports:
       # Safe local default. Change this only when intentionally publishing the
@@ -90,7 +104,8 @@ services:
       - ./wordpress:/var/www/html
 ```
 
-Save the file as `docker-compose.yml` and then execute `docker compose up`, then use browser access to `localhost:8080`.
+Save the file as `docker-compose.yml` and execute `docker compose up --build`,
+then use a browser to access `localhost:8080`.
 
 ![](.github/ready-to-use.jpg)
 
@@ -399,8 +414,9 @@ Do not copy only the main SQLite file while WordPress is running. Stop the
 container first so the database and its WAL sidecars form one consistent
 snapshot. Run the archive helper as container root: the entrypoint makes the
 database and recovery state readable by `www-data`, so an unprivileged host
-user cannot reliably archive every file from a bind mount. The helper writes a
-temporary archive, verifies it, and only then publishes the final filename.
+user cannot reliably archive every file from a bind mount. The helper reserves
+the requested filename across containers, writes and verifies the archive in
+that reservation, and publishes it with an atomic no-overwrite hard link.
 
 For the repository's default `./wordpress` bind mount:
 
@@ -417,13 +433,19 @@ docker run --rm --user 0:0 \
   -Eeuo pipefail -c '
     [[ -n "${BACKUP_NAME}" && "${BACKUP_NAME}" != */* ]]
     archive="/backup/${BACKUP_NAME}"
-    temporary="${archive}.tmp.$$"
-    test ! -e "${archive}" && test ! -L "${archive}"
-    cleanup() { rm -f -- "${temporary}"; }
+    reservation="/backup/.${BACKUP_NAME}.reserve"
+    temporary="${reservation}/archive.tar.gz"
+    mkdir -- "${reservation}"
+    cleanup() {
+      rm -f -- "${temporary}"
+      rmdir -- "${reservation}" 2>/dev/null || true
+    }
     trap cleanup EXIT
+    test ! -e "${archive}" && test ! -L "${archive}"
     tar -C /source/wp-content -czf "${temporary}" database
     tar -tzf "${temporary}" >/dev/null
-    mv -- "${temporary}" "${archive}"
+    ln -- "${temporary}" "${archive}"
+    cleanup
     trap - EXIT
   ' &&
 docker compose start wordpress
@@ -446,13 +468,19 @@ docker run --rm --user 0:0 \
   -Eeuo pipefail -c '
     [[ -n "${BACKUP_NAME}" && "${BACKUP_NAME}" != */* ]]
     archive="/backup/${BACKUP_NAME}"
-    temporary="${archive}.tmp.$$"
-    test ! -e "${archive}" && test ! -L "${archive}"
-    cleanup() { rm -f -- "${temporary}"; }
+    reservation="/backup/.${BACKUP_NAME}.reserve"
+    temporary="${reservation}/archive.tar.gz"
+    mkdir -- "${reservation}"
+    cleanup() {
+      rm -f -- "${temporary}"
+      rmdir -- "${reservation}" 2>/dev/null || true
+    }
     trap cleanup EXIT
+    test ! -e "${archive}" && test ! -L "${archive}"
     tar -C /source/wp-content -czf "${temporary}" database
     tar -tzf "${temporary}" >/dev/null
-    mv -- "${temporary}" "${archive}"
+    ln -- "${temporary}" "${archive}"
+    cleanup
     trap - EXIT
   ' &&
 docker compose start wordpress

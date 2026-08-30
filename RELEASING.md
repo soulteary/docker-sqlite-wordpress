@@ -117,8 +117,21 @@ release=2026.08.30-r1
    ```
 
 3. Pull the exact tag from each registry and repeat the installation, SQLite,
-   local core update, diagnostics, and recovery smoke tests. Create the GitHub
-   Release from the existing annotated tag only after image verification.
+   local core update, diagnostics, and recovery smoke tests. Verify the registry
+   availability gate:
+
+   ```bash
+   ./scripts/verify-published-release.sh "${release}"
+   ```
+
+   Create the GitHub Release from the existing annotated tag only after all
+   image checks succeed.
+
+4. If the release pull request carried the `release-availability: pending`
+   README marker and local-build Compose configuration, open a documentation
+   follow-up that removes the marker and switches Compose to the exact published
+   tag. `tests/test-release-availability.sh` rejects that transition until the
+   Git tag exists and Docker Hub and GHCR expose the same manifest digest.
 
 Never force-push, delete, or retarget a published release tag. If anything in
 the image or its evidence must change, publish a new CalVer revision. A failed

@@ -137,10 +137,21 @@ grep -Fq "soulteary/sqlite-wordpress:${release_version}" README.md || {
 	echo "README does not contain the ${release_version} image tag" >&2
 	exit 1
 }
-grep -Fq "image: soulteary/sqlite-wordpress:${release_version}" docker-compose.yml || {
-	echo "docker-compose.yml does not use the ${release_version} image tag" >&2
-	exit 1
-}
+if grep -Fq '<!-- release-availability: pending -->' README.md; then
+	grep -Fq 'image: sqlite-wordpress:main' docker-compose.yml || {
+		echo "pending release Compose configuration must use sqlite-wordpress:main" >&2
+		exit 1
+	}
+	grep -Eq '^[[:space:]]+build:$' docker-compose.yml || {
+		echo "pending release Compose configuration must build the current repository" >&2
+		exit 1
+	}
+else
+	grep -Fq "image: soulteary/sqlite-wordpress:${release_version}" docker-compose.yml || {
+		echo "docker-compose.yml does not use the ${release_version} image tag" >&2
+		exit 1
+	}
+fi
 # These Dockerfile label values intentionally contain literal build variables.
 # shellcheck disable=SC2016
 grep -Fq 'org.opencontainers.image.version="${IMAGE_VERSION}"' Dockerfile || {
