@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Retry only the transient `no signatures found` result after signing, allowing
+  Docker Hub and GHCR time to expose the newly pushed OCI Sigstore referrer
+  without producing another image or moving the immutable CalVer manifest.
+- Pin Cosign `v3.1.3` explicitly instead of inheriting the install action's
+  older default release.
+
 ## [2026.08.31-r3] - 2026-08-31
 
 ### Fixed

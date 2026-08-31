@@ -77,7 +77,10 @@ BuildKit emits an SPDX SBOM and maximum-mode SLSA provenance for each platform.
 The merged index receives OCI version, source, revision, and license
 annotations. GitHub Actions then signs each registry's manifest digest with a
 keyless Sigstore identity and verifies both signatures before the release job
-succeeds.
+succeeds. A registry can accept a signature referrer before making it visible
+to an immediate read. The workflow retries only Cosign's transient
+`no signatures found` result; identity, certificate, and other verification
+failures remain fail-closed.
 
 Afterward, the serialized `Promote latest` workflow selects the numerically
 newest complete CalVer release whose two registry indexes match. It promotes
@@ -116,6 +119,12 @@ without moving the tag, so they remain incomplete and require a new revision.
 If only one registry contains the exact tag, the manifests differ, or their OCI
 revision does not match the tag commit, resume fails closed and a new revision
 is required.
+
+`2026.08.31-r3` includes resume support but predates the bounded signature
+visibility retry. If its first resume reaches `Signing artifact...` and then
+reports `no signatures found`, wait for the registry referrer to become visible
+and run the same resume again. Resume mode never rebuilds or replaces the exact
+manifest; an additional valid signature referrer does not change its digest.
 
 ## Verify and announce
 
