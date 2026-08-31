@@ -297,6 +297,8 @@ jobs:
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
+        with:
+          cosign-release: v3.1.3
 
       - name: Login to Docker Hub
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -435,12 +437,17 @@ jobs:
         run: |
           set -euo pipefail
           certificate_identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yaml@${GITHUB_REF}"
+          certificate_issuer="https://token.actions.githubusercontent.com"
+
           for image in "${REGISTRY_IMAGE}" "${GHCR_IMAGE}"; do
             cosign sign --yes "${image}@${MANIFEST_DIGEST}"
-            cosign verify \
-              --certificate-identity "${certificate_identity}" \
-              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
-              "${image}@${MANIFEST_DIGEST}" >/dev/null
+          done
+
+          for image in "${REGISTRY_IMAGE}" "${GHCR_IMAGE}"; do
+            bash ./scripts/verify-cosign-signature.sh \
+              "${image}@${MANIFEST_DIGEST}" \
+              "${certificate_identity}" \
+              "${certificate_issuer}"
           done
 
       - name: Publish release summary
