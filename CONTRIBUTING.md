@@ -103,7 +103,7 @@ php tests/test-sqlite-local-core-update.php
 php tests/test-sqlite-select-id-key-fix.php
 php tests/test-tool-update-site-url.php
 php tests/test-tool-reset-user-password.php
-./scripts/validate-release.sh 2026.09.02-r1
+./scripts/validate-release.sh 2026.09.02-r2
 ```
 
 To reproduce the remaining lint and configuration checks:
