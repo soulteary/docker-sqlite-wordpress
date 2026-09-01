@@ -32,20 +32,20 @@ pinned_digest="${wordpress_image##*@}"
 PATH="${fake_bin}:${PATH}" \
 	FAKE_EXPECTED_REF="${base_image}" \
 	FAKE_MANIFEST_DIGEST="${pinned_digest}" \
-	./scripts/validate-release.sh 2026.08.31-r3 --verify-upstream >/dev/null
+	./scripts/validate-release.sh 2026.09.01-r1 --verify-upstream >/dev/null
 
 mismatch_digest="sha256:0000000000000000000000000000000000000000000000000000000000000000"
 if PATH="${fake_bin}:${PATH}" \
 	FAKE_EXPECTED_REF="${base_image}" \
 	FAKE_MANIFEST_DIGEST="${mismatch_digest}" \
-	./scripts/validate-release.sh 2026.08.31-r3 --verify-upstream \
+	./scripts/validate-release.sh 2026.09.01-r1 --verify-upstream \
 	>/dev/null 2>"${fake_bin}/mismatch.log"; then
 	echo "digest mismatch unexpectedly passed" >&2
 	exit 1
 fi
 grep -Fq "not pinned digest ${pinned_digest}" "${fake_bin}/mismatch.log"
 
-for invalid_version in 7.1.0 2026.8.31-r1 2026.02.30-r1 2026.08.31-r0; do
+for invalid_version in 7.1.0 2026.9.01-r1 2026.02.30-r1 2026.09.01-r0; do
 	if ./scripts/validate-release.sh "${invalid_version}" >/dev/null 2>"${fake_bin}/invalid.log"; then
 		echo "invalid release version unexpectedly passed: ${invalid_version}" >&2
 		exit 1

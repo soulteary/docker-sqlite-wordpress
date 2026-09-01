@@ -39,7 +39,7 @@ authoritative control.
    php tests/test-sqlite-local-core-update.php
    php tests/test-sqlite-select-id-key-fix.php
    php tests/test-tool-update-site-url.php
-   ./scripts/validate-release.sh 2026.08.31-r3
+   ./scripts/validate-release.sh 2026.09.01-r1
    ```
 
 4. Let pull-request CI test amd64, native arm64, and the 32-bit ARM pure-PHP
@@ -57,7 +57,7 @@ Do not let the GitHub Release form create a lightweight tag.
 ```bash
 git switch main
 git pull --ff-only
-release=2026.08.31-r3
+release=2026.09.01-r1
 git tag -a "${release}" -m "Release ${release}"
 test "$(git cat-file -t "refs/tags/${release}")" = tag
 git push origin "refs/tags/${release}"
@@ -70,8 +70,8 @@ the Actions page and do not start a second run while it is still active.
 The `Release` workflow builds each runtime platform once and publishes the same
 manifest digest to Docker Hub and GHCR under the immutable exact tag:
 
-- `soulteary/sqlite-wordpress:2026.08.31-r3`
-- `ghcr.io/soulteary/sqlite-wordpress:2026.08.31-r3`
+- `soulteary/sqlite-wordpress:2026.09.01-r1`
+- `ghcr.io/soulteary/sqlite-wordpress:2026.09.01-r1`
 
 BuildKit emits an SPDX SBOM and maximum-mode SLSA provenance for each platform.
 The merged index receives OCI version, source, revision, and license
@@ -120,8 +120,9 @@ If only one registry contains the exact tag, the manifests differ, or their OCI
 revision does not match the tag commit, resume fails closed and a new revision
 is required.
 
-`2026.08.31-r3` includes resume support but predates the bounded signature
-visibility retry. If its first resume reaches `Signing artifact...` and then
+The published `2026.08.31-r3` workflow snapshot includes resume support but
+predates the bounded signature visibility retry. If its first resume reaches
+`Signing artifact...` and then
 reports `no signatures found`, wait for the registry referrer to become visible
 and run the same resume again. Resume mode never rebuilds or replaces the exact
 manifest; an additional valid signature referrer does not change its digest.
@@ -131,7 +132,7 @@ manifest; an additional valid signature referrer does not change its digest.
 Set the exact tag once for all commands:
 
 ```bash
-release=2026.08.31-r3
+release=2026.09.01-r1
 ```
 
 1. Confirm both registries expose the same five runtime platforms, SBOM, and

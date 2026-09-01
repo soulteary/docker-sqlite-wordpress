@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2026.09.01-r1] - 2026-09-01
+
 ### Fixed
 
 - Match WordPress core update offers by semantic version so the WordPress 7.1
@@ -14,6 +16,19 @@
   without producing another image or moving the immutable CalVer manifest.
 - Pin Cosign `v3.1.3` explicitly instead of inheriting the install action's
   older default release.
+
+### Release status
+
+- Prepared as the first immutable release for 2026-09-01. Until its protected
+  annotated tag is published and verified, `2026.08.31-r3` remains the current
+  complete release.
+
+### Upgrade notes
+
+- Recreating a container does not overwrite a persistent `/var/www/html`.
+  Back up the site and database, recreate the container, then initiate the
+  normal core update from **Dashboard → Updates** or WP-CLI. The WordPress 7.1
+  offer uses the bundled `wordpress-7.1.0-no-content.zip` package locally.
 
 ## [2026.08.31-r3] - 2026-08-31
 
@@ -31,8 +46,11 @@
 
 ### Release status
 
+- Published to Docker Hub and GHCR as matching five-platform indexes at
+  `sha256:9716786a5213d89f0d77bbad5bd04723aad8791018d5a8811c5974df73eb40c1`.
+  Per-platform SBOM and provenance evidence and both registry signatures were
+  verified before the date alias and `latest` were promoted.
 - `2026.08.31-r2` remains an incomplete, unsigned release and was not promoted.
-  This revision is the next publishable CalVer candidate.
 
 ## [2026.08.31-r2] - 2026-08-31
 
@@ -146,7 +164,8 @@
 - SQLite Database Integration 3.0.0 uses WAL journaling by default; keep the database, `-wal`, and `-shm` files on the same persistent volume.
 - The native `wp_mysql_parser` extension is built for amd64 and arm64. Other published platforms use the integration's pure-PHP parser fallback.
 
-[Unreleased]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.08.31-r3...HEAD
+[Unreleased]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.09.01-r1...HEAD
+[2026.09.01-r1]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.08.31-r3...2026.09.01-r1
 [2026.08.31-r3]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.08.31-r2...2026.08.31-r3
 [2026.08.31-r2]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.08.31-r1...2026.08.31-r2
 [2026.08.31-r1]: https://github.com/soulteary/docker-sqlite-wordpress/compare/7.1.0...2026.08.31-r1
