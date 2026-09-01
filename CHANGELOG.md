@@ -4,6 +4,11 @@
 
 ### Added
 
+- Added a disabled-by-default SMTP must-use plugin with a Settings → SMTP page,
+  per-field environment overrides, password-file support, forced From options,
+  and fail-closed handling for invalid enabled configurations.
+- Added an optional OwlMail Compose overlay that keeps SMTP private on the
+  Compose network, publishes the local Web inbox, and persists captured mail.
 - Added a disabled-by-default `/tool-reset-user-password.php` recovery page.
   When explicitly enabled, it lists all single-site WordPress users in a
   dropdown and resets the selected account to a confirmed new password.

@@ -135,6 +135,11 @@ COPY sqlite-select-id-key-fix.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins
 # Auto-loaded from the mu-plugins root and cannot be deactivated.
 COPY sqlite-diagnostics.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-diagnostics.php
 
+# Optional SMTP transport with an administrator settings page and per-field
+# environment overrides. It is disabled by default and includes OwlMail-safe
+# defaults for the optional Compose integration.
+COPY sqlite-wordpress-smtp.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-wordpress-smtp.php
+
 # WordPress's official entrypoint intentionally leaves an initialized docroot
 # untouched. Bundle the exact pinned core as a no-content archive and let this
 # MU plugin replace only matching WordPress.org update offers with a verified
@@ -206,6 +211,7 @@ RUN test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-inte
     test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration/wp-includes/database/load.php" && \
     test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration/integrations/query-monitor/boot.php" && \
     test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-local-core-update.php" && \
+    test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-wordpress-smtp.php" && \
     test -s "/usr/src/wordpress-upgrades/wordpress-${WORDPRESS_VERSION}-no-content.zip" && \
     test -f "${WORDPRESS_PREPARE_DIR}/tool-update-site-url.php" && \
     test -f "${WORDPRESS_PREPARE_DIR}/tool-reset-user-password.php" && \

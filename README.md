@@ -114,6 +114,96 @@ then use a browser to access `localhost:8080`.
 
 Use the quick 1-minute initial installation, enjoy.
 
+## SMTP and OwlMail Integration
+
+The image includes a disabled-by-default `sqlite-wordpress-smtp.php` must-use
+plugin. It routes WordPress `wp_mail()` calls through SMTP without requiring a
+third-party mail plugin. Administrators can configure it under
+**Settings → SMTP**. The page covers the transport state, host, port,
+encryption, automatic TLS, authentication, username/password, forced From
+identity, and connection timeout.
+
+Each setting may instead be controlled by an environment variable. An
+environment value overrides only its matching database-backed field; the page
+shows the effective value as read-only and preserves the stored value for use
+after the override is removed. Boolean environment values must use the exact
+lowercase strings `true` or `false`. Invalid enabled SMTP configuration blocks
+`wp_mail()` and emits `wp_mail_failed` instead of silently falling back to PHP
+`mail()`.
+
+| Setting | Environment variable | Default |
+| --- | --- | --- |
+| Enable transport | `WORDPRESS_SMTP_ENABLED` | `false` |
+| Host | `WORDPRESS_SMTP_HOST` | `owlmail` |
+| Port | `WORDPRESS_SMTP_PORT` | `1025` |
+| Encryption | `WORDPRESS_SMTP_ENCRYPTION` (`none`, `tls`, `ssl`) | `none` |
+| Automatic TLS | `WORDPRESS_SMTP_AUTO_TLS` | `false` |
+| Authentication | `WORDPRESS_SMTP_AUTH` | `false` |
+| Username | `WORDPRESS_SMTP_USERNAME` | empty |
+| Password | `WORDPRESS_SMTP_PASSWORD` | empty |
+| Password file | `WORDPRESS_SMTP_PASSWORD_FILE` | empty |
+| From email | `WORDPRESS_SMTP_FROM_EMAIL` | empty |
+| From name | `WORDPRESS_SMTP_FROM_NAME` | empty |
+| Force From | `WORDPRESS_SMTP_FORCE_FROM` | `false` |
+| Connection timeout | `WORDPRESS_SMTP_TIMEOUT` | `10` seconds |
+
+Do not configure `WORDPRESS_SMTP_PASSWORD` and
+`WORDPRESS_SMTP_PASSWORD_FILE` together. The file form is preferred for
+deployments because a direct password is visible in container environment
+metadata. A password entered in the administration page is stored in the
+WordPress database and is never rendered back into the form.
+
+### Start with OwlMail
+
+The optional [`docker-compose.owlmail.yml`](./docker-compose.owlmail.yml)
+overlay starts OwlMail on the same private Compose network, persists its
+messages, and publishes only its Web inbox to the host:
+
+```bash
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.owlmail.yml \
+  up --build -d
+```
+
+Open WordPress at `http://localhost:8080`, visit **Settings → SMTP**, and enable
+SMTP. The stored defaults already target `owlmail:1025` with encryption,
+automatic TLS, and authentication disabled. View captured messages at
+`http://localhost:1080`.
+
+For a fully environment-controlled OwlMail start, export the fields forwarded
+by the overlay and recreate the WordPress container:
+
+```bash
+export WORDPRESS_SMTP_ENABLED=true
+export WORDPRESS_SMTP_HOST=owlmail
+export WORDPRESS_SMTP_PORT=1025
+export WORDPRESS_SMTP_ENCRYPTION=none
+export WORDPRESS_SMTP_AUTO_TLS=false
+export WORDPRESS_SMTP_AUTH=false
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.owlmail.yml \
+  up --build -d --force-recreate
+```
+
+Send a test message through the real WordPress mail path:
+
+```bash
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.owlmail.yml \
+  exec wordpress php -r \
+  'require "/var/www/html/wp-load.php"; exit(wp_mail("test@example.com", "OwlMail test", "Hello from WordPress") ? 0 : 1);'
+```
+
+OwlMail's incoming SMTP username/password settings are not currently an access
+control boundary. The overlay therefore does not publish port `1025` to the
+host. Keep it on a trusted private network; protect the Web inbox separately
+when it is exposed beyond loopback. For real delivery, configure a trusted
+outbound SMTP service and TLS/authentication settings rather than exposing the
+OwlMail listener publicly.
+
 ## Image Versions and Supply-chain Evidence
 
 Image releases use CalVer such as `2026.09.01-r1`; WordPress and SQLite

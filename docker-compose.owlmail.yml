@@ -1,0 +1,36 @@
+services:
+
+  wordpress:
+    depends_on:
+      owlmail:
+        condition: service_healthy
+    # Unset entries are omitted by Compose, leaving the matching fields under
+    # Settings -> SMTP control. Export any entry before recreating the service
+    # to make that field an environment-controlled, read-only override.
+    environment:
+      - WORDPRESS_SMTP_ENABLED
+      - WORDPRESS_SMTP_HOST
+      - WORDPRESS_SMTP_PORT
+      - WORDPRESS_SMTP_ENCRYPTION
+      - WORDPRESS_SMTP_AUTO_TLS
+      - WORDPRESS_SMTP_AUTH
+      - WORDPRESS_SMTP_USERNAME
+      - WORDPRESS_SMTP_PASSWORD
+      - WORDPRESS_SMTP_PASSWORD_FILE
+      - WORDPRESS_SMTP_FROM_EMAIL
+      - WORDPRESS_SMTP_FROM_NAME
+      - WORDPRESS_SMTP_FORCE_FROM
+      - WORDPRESS_SMTP_TIMEOUT
+
+  owlmail:
+    image: ghcr.io/soulteary/owlmail:0.5.0
+    restart: unless-stopped
+    ports:
+      # The SMTP listener stays private on the Compose network. Only the local
+      # browser inbox is published to the host.
+      - 127.0.0.1:1080:1080
+    volumes:
+      - owlmail-mail:/app/mail
+
+volumes:
+  owlmail-mail:
