@@ -140,6 +140,11 @@ COPY sqlite-diagnostics.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlit
 # defaults for the optional Compose integration.
 COPY sqlite-wordpress-smtp.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-wordpress-smtp.php
 
+# Optional, disabled-by-default server performance display. Administrators or
+# an exact boolean environment override can expose generation time and PHP
+# memory usage in the toolbar and public page footer.
+COPY sqlite-wordpress-performance.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-wordpress-performance.php
+
 # WordPress's official entrypoint intentionally leaves an initialized docroot
 # untouched. Bundle the exact pinned core as a no-content archive and let this
 # MU plugin replace only matching WordPress.org update offers with a verified
@@ -211,6 +216,7 @@ RUN test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-inte
     test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration/wp-includes/database/load.php" && \
     test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration/integrations/query-monitor/boot.php" && \
     test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-local-core-update.php" && \
+    test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-wordpress-performance.php" && \
     test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-wordpress-smtp.php" && \
     test -s "/usr/src/wordpress-upgrades/wordpress-${WORDPRESS_VERSION}-no-content.zip" && \
     test -f "${WORDPRESS_PREPARE_DIR}/tool-update-site-url.php" && \

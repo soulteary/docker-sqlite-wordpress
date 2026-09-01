@@ -42,6 +42,7 @@ docker run --rm --platform "${platform}" --entrypoint bash "${image}" -ceu '
   test -f /usr/src/wordpress/wp-content/mu-plugins/sqlite-diagnostics.php
   test -f /usr/src/wordpress/wp-content/mu-plugins/sqlite-local-core-update.php
   test -f /usr/src/wordpress/wp-content/mu-plugins/sqlite-select-id-key-fix.php
+  test -f /usr/src/wordpress/wp-content/mu-plugins/sqlite-wordpress-performance.php
   test -f /usr/src/wordpress/wp-content/mu-plugins/sqlite-wordpress-smtp.php
   test -f /usr/src/wordpress/tool-update-site-url.php
   test -f /usr/src/wordpress/tool-reset-user-password.php
@@ -55,6 +56,7 @@ docker run --rm --platform "${platform}" --entrypoint bash "${image}" -ceu '
   ! grep -Eq "\{WORDPRESS_(VERSION|CORE_PACKAGE_SHA256)\}" /usr/src/wordpress/wp-content/mu-plugins/sqlite-local-core-update.php
   php -l /usr/src/wordpress/wp-content/db.php
   php -l /usr/src/wordpress/wp-content/mu-plugins/sqlite-local-core-update.php
+  php -l /usr/src/wordpress/wp-content/mu-plugins/sqlite-wordpress-performance.php
   php -l /usr/src/wordpress/wp-content/mu-plugins/sqlite-wordpress-smtp.php
   php -l /usr/src/wordpress/tool-update-site-url.php
   php -l /usr/src/wordpress/tool-reset-user-password.php
