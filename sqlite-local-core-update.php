@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SQLite WordPress Local Core Update
  * Description: Uses the core upgrade archive bundled with the container when WordPress offers the matching version.
- * Version: 1.0.0
+ * Version: 1.0.1
  * License: Apache-2.0
  */
 
@@ -67,6 +67,34 @@ function sqlite_wordpress_local_core_package_is_valid() {
 }
 
 /**
+ * Checks whether two stable numeric core versions name the same release.
+ *
+ * WordPress omits trailing patch-zero components from major release versions,
+ * while the official Docker image tag includes them (for example, 7.1 versus
+ * 7.1.0). Pre-release and otherwise non-numeric versions must still match
+ * exactly and are therefore not accepted here.
+ *
+ * @param string $offered_version Version returned by the WordPress update API.
+ * @param string $bundled_version Version used to build the local package.
+ * @return bool
+ */
+function sqlite_wordpress_local_core_versions_match( $offered_version, $bundled_version ) {
+	$numeric_version_pattern = '/^[0-9]+(?:\.[0-9]+)*$/D';
+	if ( ! is_string( $offered_version )
+		|| ! is_string( $bundled_version )
+		|| ! preg_match( $numeric_version_pattern, $offered_version )
+		|| ! preg_match( $numeric_version_pattern, $bundled_version )
+	) {
+		return false;
+	}
+
+	$offered_version = preg_replace( '/(?:\.0)+$/D', '', $offered_version );
+	$bundled_version = preg_replace( '/(?:\.0)+$/D', '', $bundled_version );
+
+	return $offered_version === $bundled_version;
+}
+
+/**
  * Replaces only the matching WordPress.org core offer with the local archive.
  *
  * Rollback packages are deliberately left untouched. If the archive is
@@ -93,7 +121,7 @@ function sqlite_wordpress_local_core_update_offer( $transient ) {
 	foreach ( $transient->updates as $update ) {
 		if ( ! is_object( $update )
 			|| ! isset( $update->current )
-			|| SQLITE_WORDPRESS_LOCAL_CORE_VERSION !== (string) $update->current
+			|| ! sqlite_wordpress_local_core_versions_match( $update->current, SQLITE_WORDPRESS_LOCAL_CORE_VERSION )
 		) {
 			continue;
 		}

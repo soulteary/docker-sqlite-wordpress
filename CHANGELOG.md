@@ -4,6 +4,11 @@
 
 ### Fixed
 
+- Match WordPress core update offers by semantic version so the WordPress 7.1
+  API version (`7.1`) resolves to the bundled image package version (`7.1.0`)
+  instead of downloading `wordpress-7.1-no-content.zip` from WordPress.org.
+- Refresh the pinned `wordpress:7.1.0-php8.5-apache` manifest digest after the
+  official tag changed, restoring the multi-architecture image preflight.
 - Retry only the transient `no signatures found` result after signing, allowing
   Docker Hub and GHCR time to expose the newly pushed OCI Sigstore referrer
   without producing another image or moving the immutable CalVer manifest.
