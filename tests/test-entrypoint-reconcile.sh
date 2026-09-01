@@ -30,6 +30,8 @@ mkdir -p "${stub_bin}" "${src_plugin}" "${dst_plugin}" "${dst_content}/database"
 chmod 0751 "${src_plugin}"
 printf '#!/usr/bin/env bash\nexit 0\n' > "${stub_bin}/docker-ensure-installed.sh"
 chmod +x "${stub_bin}/docker-ensure-installed.sh"
+# These variables must expand when the generated child script runs.
+# shellcheck disable=SC2016
 printf '%s\n' \
 	'#!/usr/bin/env bash' \
 	'test "${SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED:-}" = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"' \
