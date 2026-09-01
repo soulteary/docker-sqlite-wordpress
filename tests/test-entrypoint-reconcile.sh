@@ -68,7 +68,8 @@ for managed_file in \
 	"sqlite-database-integration-loader.php" \
 	"sqlite-diagnostics.php" \
 	"sqlite-local-core-update.php" \
-	"sqlite-select-id-key-fix.php"
+	"sqlite-select-id-key-fix.php" \
+	"sqlite-wordpress-smtp.php"
 do
 	printf 'new %s\n' "${managed_file}" > "${src_content}/mu-plugins/${managed_file}"
 	printf 'old %s\n' "${managed_file}" > "${dst_content}/mu-plugins/${managed_file}"
@@ -107,7 +108,8 @@ for managed_file in \
 	"sqlite-database-integration-loader.php" \
 	"sqlite-diagnostics.php" \
 	"sqlite-local-core-update.php" \
-	"sqlite-select-id-key-fix.php"
+	"sqlite-select-id-key-fix.php" \
+	"sqlite-wordpress-smtp.php"
 do
 	cmp "${src_content}/mu-plugins/${managed_file}" "${dst_content}/mu-plugins/${managed_file}"
 done

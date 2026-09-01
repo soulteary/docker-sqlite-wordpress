@@ -63,6 +63,7 @@ jobs:
               sqlite-diagnostics.php \
               sqlite-local-core-update.php \
               sqlite-select-id-key-fix.php \
+              sqlite-wordpress-smtp.php \
               tool-reset-user-password.php \
               tool-update-site-url.php \
               tests/image-smoke.sh \
