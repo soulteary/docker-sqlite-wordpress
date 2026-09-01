@@ -114,6 +114,36 @@ then use a browser to access `localhost:8080`.
 
 Use the quick 1-minute initial installation, enjoy.
 
+## Page Performance Information
+
+The image includes a disabled-by-default `sqlite-wordpress-performance.php`
+must-use plugin. Enable it under **Settings → Page Performance** to show the
+server-side page generation time, current PHP memory usage, and peak PHP memory
+usage in the WordPress toolbar on both front-end and administration pages. A
+compact status row is also added to the bottom of normal public pages.
+
+The footer is visible to public visitors while enabled; the toolbar value is
+shown only when the WordPress toolbar itself is visible. Metrics are sampled
+near the end of page output, so they describe PHP/WordPress generation work and
+do not include network transfer, browser rendering, or later asynchronous
+requests.
+
+Container operators can override the administrator setting with the exact
+lowercase boolean environment variable
+`WORDPRESS_PAGE_PERFORMANCE_ENABLED=true` or
+`WORDPRESS_PAGE_PERFORMANCE_ENABLED=false`. While the variable is present, the
+setting is read-only in WordPress and its stored value is preserved. Remove the
+variable and recreate the container to return control to the administration
+page. Invalid values keep the display disabled and raise an administrator
+notice.
+
+```yaml
+services:
+  wordpress:
+    environment:
+      WORDPRESS_PAGE_PERFORMANCE_ENABLED: "true"
+```
+
 ## SMTP and OwlMail Integration
 
 The image includes a disabled-by-default `sqlite-wordpress-smtp.php` must-use

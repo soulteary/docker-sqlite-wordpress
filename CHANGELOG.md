@@ -4,6 +4,11 @@
 
 ### Added
 
+- Added a disabled-by-default page performance must-use plugin. It can be
+  enabled under Settings → Page Performance or with
+  `WORDPRESS_PAGE_PERFORMANCE_ENABLED=true`, and reports server-side generation
+  time plus current/peak PHP memory in the front-end/admin toolbar and public
+  page footer.
 - Added a disabled-by-default SMTP must-use plugin with a Settings → SMTP page,
   per-field environment overrides, password-file support, forced From options,
   and fail-closed handling for invalid enabled configurations.

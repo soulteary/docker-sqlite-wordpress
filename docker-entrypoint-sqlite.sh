@@ -206,6 +206,7 @@ if [ -d "$src_content" ] && [ -d "$DOCROOT" ]; then
 			"sqlite-diagnostics.php"
 			"sqlite-local-core-update.php"
 			"sqlite-select-id-key-fix.php"
+			"sqlite-wordpress-performance.php"
 			"sqlite-wordpress-smtp.php"
 		)
 		for managed_file in "${managed_mu_plugin_files[@]}"; do

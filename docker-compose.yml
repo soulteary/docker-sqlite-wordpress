@@ -30,6 +30,10 @@ services:
       # updater by default. Set the exact value false to require remote packages.
       WORDPRESS_LOCAL_CORE_UPDATE_ENABLED: "${WORDPRESS_LOCAL_CORE_UPDATE_ENABLED:-true}"
 
+      # Optional page timing and PHP memory display. Uncomment to control it
+      # through Compose; leave it absent to use Settings -> Page Performance.
+      # WORDPRESS_PAGE_PERFORMANCE_ENABLED: "true"
+
       # TOKEN_FILE is preferred for shared or internet-reachable hosts. Uncomment
       # this line and the service/top-level secrets blocks below. Leave PASSWORD
       # unset or empty: TOKEN_FILE and PASSWORD are mutually exclusive.
