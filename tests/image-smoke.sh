@@ -95,10 +95,12 @@ docker run --rm --platform "${platform}" \
     fwrite(STDERR, "Packaged local core archive failed runtime validation.\n");
     exit(1);
   }
+  require "/usr/src/wordpress/wp-includes/version.php";
+  $bundled_wordpress_version = $wp_version;
   $GLOBALS["wp_version"] = "0.0.0";
   $remote = "https://downloads.wordpress.org/release/wordpress.zip";
   $update = (object) [
-    "current" => SQLITE_WORDPRESS_LOCAL_CORE_VERSION,
+    "current" => $bundled_wordpress_version,
     "packages" => (object) ["full" => $remote, "rollback" => $remote],
   ];
   $filtered = sqlite_wordpress_local_core_update_offer((object) ["updates" => [$update]]);
