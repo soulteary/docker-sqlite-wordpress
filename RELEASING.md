@@ -39,12 +39,13 @@ authoritative control.
    php tests/test-sqlite-local-core-update.php
    php tests/test-sqlite-select-id-key-fix.php
    php tests/test-tool-update-site-url.php
+   php tests/test-tool-reset-user-password.php
    ./scripts/validate-release.sh 2026.09.01-r1
    ```
 
 4. Let pull-request CI test amd64, native arm64, and the 32-bit ARM pure-PHP
    fallback. Verify the local core archive and updater, SQLite CRUD, diagnostics,
-   and site URL recovery behavior.
+   site URL recovery, and user password reset behavior.
 5. Merge the verified release pull request to `main`. Prepare GitHub Release
    notes from its matching changelog section, including upgrade and compatibility
    notes.

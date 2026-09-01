@@ -63,8 +63,10 @@ jobs:
               sqlite-diagnostics.php \
               sqlite-local-core-update.php \
               sqlite-select-id-key-fix.php \
+              tool-reset-user-password.php \
               tool-update-site-url.php \
               tests/image-smoke.sh \
+              tests/image-smoke-user-password.php \
               tests/image-smoke-site-url.php; then
             image_changed=false
           fi

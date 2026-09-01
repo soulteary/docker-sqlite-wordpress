@@ -13,6 +13,9 @@ This policy covers issues **introduced by this project**, including:
   `sqlite-select-id-key-fix.php`, and image-local core update components.
 - The disabled-by-default, credential-protected `/tool-update-site-url.php`
   recovery endpoint and its persistent throttle/one-shot state handling.
+- The disabled-by-default, credential-protected
+  `/tool-reset-user-password.php` endpoint and its independent persistent
+  throttle/one-shot state handling.
 - The packaging and configuration of the native `wp_mysql_parser` extension.
 - The release workflows under `.github/workflows/`.
 
@@ -109,3 +112,10 @@ While not vulnerabilities in this image, the following practices reduce your exp
   Do not rely on the in-process environment change to rewrite Docker Compose;
   remove the enable switch and credential and recreate the container after use.
   Rearm only through the documented disabled-start sequence with a new secret.
+- Apply the same restrictions to the user password reset endpoint. Leave
+  `WORDPRESS_USER_PASSWORD_RESET_TOOL_ENABLED` disabled normally, prefer
+  `WORDPRESS_USER_PASSWORD_RESET_TOKEN_FILE`, and restrict
+  `/tool-reset-user-password.php` to loopback or a TLS/IP-allowlisted proxy.
+  While enabled, its dropdown reveals WordPress login and display names to
+  anyone who can reach the page, so keep the enable window short. Remove the
+  reset credential and recreate the container immediately after use.

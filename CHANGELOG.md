@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added a disabled-by-default `/tool-reset-user-password.php` recovery page.
+  When explicitly enabled, it lists all single-site WordPress users in a
+  dropdown and resets the selected account to a confirmed new password.
+- Gave the password reset endpoint independent TOKEN_FILE/PASSWORD credentials,
+  persistent global throttling, concurrent-operation exclusion, and one-shot
+  state. A consumed reset remains closed across PHP workers and container
+  restarts until the tool is deliberately disabled once.
+
 ## [2026.09.01-r1] - 2026-09-01
 
 ### Fixed

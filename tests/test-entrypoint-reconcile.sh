@@ -30,21 +30,36 @@ mkdir -p "${stub_bin}" "${src_plugin}" "${dst_plugin}" "${dst_content}/database"
 chmod 0751 "${src_plugin}"
 printf '#!/usr/bin/env bash\nexit 0\n' > "${stub_bin}/docker-ensure-installed.sh"
 chmod +x "${stub_bin}/docker-ensure-installed.sh"
-printf "#!/usr/bin/env bash\ntest \"\${SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED:-}\" = \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n" > "${stub_bin}/assert-site-url-token"
-chmod +x "${stub_bin}/assert-site-url-token"
+# These variables must expand when the generated child script runs.
+# shellcheck disable=SC2016
+printf '%s\n' \
+	'#!/usr/bin/env bash' \
+	'test "${SQLITE_WORDPRESS_SITE_URL_UPDATE_TOKEN_RESOLVED:-}" = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"' \
+	'test "${SQLITE_WORDPRESS_USER_PASSWORD_RESET_TOKEN_RESOLVED:-}" = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"' \
+	> "${stub_bin}/assert-recovery-tokens"
+chmod +x "${stub_bin}/assert-recovery-tokens"
 printf 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n' > "${fixture_root}/site-url-token"
 chmod 600 "${fixture_root}/site-url-token"
+printf 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n' > "${fixture_root}/user-password-token"
+chmod 600 "${fixture_root}/user-password-token"
 recovery_state_file="${dst_content}/database/.ht.site-url-update-tool-state"
 recovery_lock_file="${recovery_state_file}.lock"
 printf 'used recovery state\n' > "${recovery_state_file}"
 printf 'recovery lock\n' > "${recovery_lock_file}"
+password_state_file="${dst_content}/database/.ht.user-password-reset-tool-state"
+password_lock_file="${password_state_file}.lock"
+printf 'used password reset state\n' > "${password_state_file}"
+printf 'password reset lock\n' > "${password_lock_file}"
 
 printf 'new drop-in\n' > "${src_content}/db.php"
 printf 'new recovery tool\n' > "${prepare_dir}/tool-update-site-url.php"
+printf 'new password reset tool\n' > "${prepare_dir}/tool-reset-user-password.php"
 printf 'outside drop-in must remain unchanged\n' > "${fixture_root}/outside-drop-in"
 ln -s "${fixture_root}/outside-drop-in" "${dst_content}/db.php"
 printf 'outside recovery tool must remain unchanged\n' > "${fixture_root}/outside-recovery-tool"
 ln -s "${fixture_root}/outside-recovery-tool" "${docroot}/tool-update-site-url.php"
+printf 'outside password reset tool must remain unchanged\n' > "${fixture_root}/outside-password-tool"
+ln -s "${fixture_root}/outside-password-tool" "${docroot}/tool-reset-user-password.php"
 printf 'new integration file\n' > "${src_plugin}/current.php"
 printf 'old integration file\n' > "${dst_plugin}/current.php"
 printf 'removed upstream file\n' > "${dst_plugin}/stale.php"
@@ -67,9 +82,10 @@ PATH="${stub_bin}:${PATH}" \
 	WORDPRESS_PREPARE_DIR="${prepare_dir}" \
 	WORDPRESS_DOCROOT="${docroot}" \
 	WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE="${fixture_root}/site-url-token" \
+	WORDPRESS_USER_PASSWORD_RESET_TOKEN_FILE="${fixture_root}/user-password-token" \
 	APACHE_RUN_USER="$(id -u)" \
 	APACHE_RUN_GROUP="$(id -g)" \
-	bash "${repo_root}/docker-entrypoint-sqlite.sh" assert-site-url-token
+	bash "${repo_root}/docker-entrypoint-sqlite.sh" assert-recovery-tokens
 
 cmp "${src_content}/db.php" "${dst_content}/db.php"
 test ! -L "${dst_content}/db.php"
@@ -78,6 +94,10 @@ cmp "${prepare_dir}/tool-update-site-url.php" "${docroot}/tool-update-site-url.p
 test ! -L "${docroot}/tool-update-site-url.php"
 test "$(stat -c '%a' "${docroot}/tool-update-site-url.php")" = '644'
 grep -Fxq 'outside recovery tool must remain unchanged' "${fixture_root}/outside-recovery-tool"
+cmp "${prepare_dir}/tool-reset-user-password.php" "${docroot}/tool-reset-user-password.php"
+test ! -L "${docroot}/tool-reset-user-password.php"
+test "$(stat -c '%a' "${docroot}/tool-reset-user-password.php")" = '644'
+grep -Fxq 'outside password reset tool must remain unchanged' "${fixture_root}/outside-password-tool"
 diff -qr "${src_plugin}" "${dst_plugin}"
 test "$(stat -c '%a' "${dst_plugin}")" = "$(stat -c '%a' "${src_plugin}")"
 test ! -e "${dst_plugin}/stale.php"
@@ -98,6 +118,8 @@ grep -Fxq 'outside loader must remain unchanged' "${fixture_root}/outside-loader
 test -f "${dst_content}/database/.ht.sqlite"
 test ! -e "${recovery_state_file}"
 test ! -e "${recovery_lock_file}"
+test ! -e "${password_state_file}"
+test ! -e "${password_lock_file}"
 assert_no_reconcile_artifacts
 
 # A persisted symlink must be replaced even when its target already has exactly
@@ -242,13 +264,19 @@ assert_no_reconcile_artifacts
 # recovery configuration cannot reopen an authorization that was already used.
 printf 'used recovery state\n' > "${recovery_state_file}"
 printf 'recovery lock\n' > "${recovery_lock_file}"
+printf 'used password reset state\n' > "${password_state_file}"
+printf 'password reset lock\n' > "${password_lock_file}"
 PATH="${stub_bin}:${PATH}" \
 	WORDPRESS_PREPARE_DIR="${prepare_dir}" \
 	WORDPRESS_DOCROOT="${docroot}" \
 	WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED=true \
 	WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE="${fixture_root}/site-url-token" \
+	WORDPRESS_USER_PASSWORD_RESET_TOOL_ENABLED=true \
+	WORDPRESS_USER_PASSWORD_RESET_TOKEN_FILE="${fixture_root}/user-password-token" \
 	APACHE_RUN_USER="$(id -u)" \
 	APACHE_RUN_GROUP="$(id -g)" \
-	bash "${repo_root}/docker-entrypoint-sqlite.sh" assert-site-url-token
+	bash "${repo_root}/docker-entrypoint-sqlite.sh" assert-recovery-tokens
 grep -Fxq 'used recovery state' "${recovery_state_file}"
 grep -Fxq 'recovery lock' "${recovery_lock_file}"
+grep -Fxq 'used password reset state' "${password_state_file}"
+grep -Fxq 'password reset lock' "${password_lock_file}"
