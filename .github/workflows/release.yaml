@@ -1,9 +1,9 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]-r[0-9]*"
+  release:
+    types:
+      - published
   workflow_dispatch:
     inputs:
       resume_existing:
@@ -13,7 +13,7 @@ on:
         type: boolean
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event.release.tag_name || github.ref }}
   cancel-in-progress: false
 
 env:
@@ -37,6 +37,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          ref: ${{ github.event.release.tag_name || github.ref }}
 
       - name: Validate release tag and project versions
         id: release
@@ -44,6 +45,8 @@ jobs:
           RELEASE_REF_PROTECTED: ${{ github.ref_protected }}
           RELEASE_REF_TYPE: ${{ github.ref_type }}
           RELEASE_REF_NAME: ${{ github.ref_name }}
+          RELEASE_EVENT_NAME: ${{ github.event_name }}
+          RELEASE_EVENT_TAG: ${{ github.event.release.tag_name || '' }}
         run: |
           set -euo pipefail
           if [[ "${RELEASE_REF_TYPE}" != "tag" ]]; then
@@ -54,10 +57,20 @@ jobs:
             echo "::error::Release tag ${RELEASE_REF_NAME} is not covered by an active GitHub ruleset."
             exit 1
           fi
-          if [[ "$(git cat-file -t "refs/tags/${RELEASE_REF_NAME}")" != "tag" ]]; then
-            echo "::error::Release tag ${RELEASE_REF_NAME} must be annotated."
+          if [[ "${RELEASE_EVENT_NAME}" == "release" && "${RELEASE_EVENT_TAG}" != "${RELEASE_REF_NAME}" ]]; then
+            echo "::error::Published release tag ${RELEASE_EVENT_TAG} does not match workflow ref ${RELEASE_REF_NAME}."
             exit 1
           fi
+
+          tag_object_type="$(git cat-file -t "refs/tags/${RELEASE_REF_NAME}")"
+          case "${tag_object_type}" in
+            tag|commit) ;;
+            *)
+              echo "::error::Unsupported release tag object type: ${tag_object_type}."
+              exit 1
+              ;;
+          esac
+          echo "Release tag ${RELEASE_REF_NAME} uses ${tag_object_type} object type."
 
           source_sha="$(git rev-parse "refs/tags/${RELEASE_REF_NAME}^{commit}")"
           checkout_sha="$(git rev-parse HEAD)"

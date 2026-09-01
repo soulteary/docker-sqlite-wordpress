@@ -52,22 +52,22 @@ authoritative control.
 
 ## Publish
 
-Create an annotated tag at the verified `main` commit and push that exact ref.
-The GitHub Releases web form must only select an existing tag: its **Create new
-tag** option creates a lightweight tag that this workflow deliberately rejects.
+Publish from the GitHub Releases page after the release pull request is merged
+and `main` CI succeeds:
 
-```bash
-git switch main
-git pull --ff-only
-release=2026.09.02-r2
-git tag -a "${release}" -m "Release ${release}"
-test "$(git cat-file -t "refs/tags/${release}")" = tag
-git push origin "refs/tags/${release}"
-```
+1. Open **Releases → Draft a new release**.
+2. Enter `2026.09.02-r2` in **Choose a tag**, choose **Create new tag**, and
+   target the current `main` branch.
+3. Generate and review the release notes, then select **Publish release**.
 
-The tag push is the publication trigger. Creating or publishing a GitHub
-Release does not trigger the image workflow. Confirm the tag-triggered run in
-the Actions page and do not start a second run while it is still active.
+Publishing the GitHub Release creates a protected lightweight tag and
+automatically starts the image release workflow. The workflow also accepts an
+existing protected annotated tag. Do not start a second run while the
+release-triggered run is active.
+
+For an annotated tag, create and push it first, then select that existing tag
+in the GitHub Releases form. A tag push alone no longer starts publication;
+publishing the GitHub Release is the single fresh-release trigger.
 
 The `Release` workflow builds each runtime platform once and publishes the same
 manifest digest to Docker Hub and GHCR under the immutable exact tag:
@@ -90,20 +90,20 @@ both the date alias (for example `2026.08.31`) and `latest` without rebuilding.
 If the newest Git tag is incomplete, promotion scans backward to the newest
 complete release rather than blocking all promotion.
 
-Manual `Release` dispatch is allowed only when the selected workflow ref is an
-annotated CalVer tag. A fresh publication requires the exact image tag to be
+Manual `Release` dispatch is allowed only when the selected workflow ref is a
+protected CalVer tag. A fresh publication requires the exact image tag to be
 absent from both registries. Running it from a branch fails preflight.
 Manual `Promote latest` dispatch from `main` can reconcile mutable aliases.
 
 ### Recover from a failed preflight
 
 Do not move, delete, or reuse a public exact CalVer tag after a failed release.
-A rerun cannot turn a lightweight tag into an annotated tag or make a tag name
+A rerun uses the same source and workflow snapshot and cannot make a tag name
 match a different `IMAGE_VERSION`. Keep the failed tag and source release for
-audit history, correct the ruleset and source version through a pull request,
-increment the revision, and publish a new annotated protected tag. A workflow
-that stopped in preflight did not reach the image build or registry publication
-jobs.
+audit history, correct the source version through a pull request, increment the
+revision, and publish a new protected tag through the GitHub Releases page. A
+workflow that stopped in preflight did not reach the image build or registry
+publication jobs.
 
 ### Resume after manifest creation
 

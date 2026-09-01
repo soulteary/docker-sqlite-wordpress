@@ -12,6 +12,17 @@
 - Aligned the image version, validation examples, deployment examples, and
   release documentation on the same `2026.09.02-r2` candidate.
 
+### Changed
+
+- Simplified fresh publication to one GitHub web action: publishing a Release
+  now creates or selects its protected tag and automatically starts the image
+  workflow.
+- Accepted protected lightweight and annotated CalVer tags under the same
+  immutable-tag, `main` ancestry, version, and registry preflight checks.
+- Kept manual workflow dispatch for explicit recovery while removing the tag
+  push trigger, preventing duplicate runs when an existing annotated tag is
+  later attached to a GitHub Release.
+
 ### Release status
 
 - Prepared as the next immutable release for 2026-09-02. Until its protected
