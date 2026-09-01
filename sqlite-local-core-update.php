@@ -3,6 +3,7 @@
  * Plugin Name: SQLite WordPress Local Core Update
  * Description: Uses the core upgrade archive bundled with the container when WordPress offers the matching version.
  * Version: 1.0.1
+ * Author: soulteary
  * License: Apache-2.0
  */
 
