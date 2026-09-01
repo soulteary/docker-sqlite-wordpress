@@ -23,6 +23,14 @@ for plugin in "${project_mu_plugins[@]}"; do
 		echo "Project-owned MU Plugin is not attributed to soulteary: ${plugin}" >&2
 		exit 1
 	fi
+	if ! grep -Eq '^[[:space:]]*\*[[:space:]]+Author URI:[[:space:]]+https://soulteary\.com[[:space:]]*$' "${plugin}"; then
+		echo "Project-owned MU Plugin has an invalid author URI: ${plugin}" >&2
+		exit 1
+	fi
+	if ! grep -Eq '^[[:space:]]*\*[[:space:]]+Plugin URI:[[:space:]]+https://github\.com/soulteary/docker-sqlite-wordpress[[:space:]]*$' "${plugin}"; then
+		echo "Project-owned MU Plugin has an invalid plugin URI: ${plugin}" >&2
+		exit 1
+	fi
 done
 
 echo "Project-owned MU Plugin metadata is valid."

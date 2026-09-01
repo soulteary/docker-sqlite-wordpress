@@ -1,9 +1,11 @@
 <?php
 /**
  * Plugin Name: SQLite WordPress Page Performance
+ * Plugin URI: https://github.com/soulteary/docker-sqlite-wordpress
  * Description: Optionally displays server-side page generation time and PHP memory usage in the WordPress toolbar and public page footer.
  * Version: 1.0.0
  * Author: soulteary
+ * Author URI: https://soulteary.com
  * License: Apache-2.0
  *
  * @package sqlite-wordpress-performance

@@ -1,9 +1,11 @@
 <?php
 /**
  * Plugin Name: SQLite Diagnostics
+ * Plugin URI: https://github.com/soulteary/docker-sqlite-wordpress
  * Description: Read-only diagnostics page under the Tools menu that surfaces the native wp_mysql_parser lexer/parser state, SQLite version/source id, live-connection PRAGMA values, main/WAL/SHM storage sizes, PHP/architecture environment details, and the sqlite-database-integration plugin version. Performs no writes and never modifies the live site database.
  * Version: 1.0.0
  * Author: soulteary
+ * Author URI: https://soulteary.com
  *
  * Background:
  * The SQLite WordPress image stitches together several moving parts: an optional
