@@ -372,6 +372,51 @@ and forwarded `Host` / `X-Forwarded-Proto` headers. The recovery tool changes
 only the two database options and cannot repair content URLs or external proxy
 configuration.
 
+## Emergency User Password Reset Tool
+
+The image also includes `/tool-reset-user-password.php` for local account
+recovery when no administrator can sign in. Once explicitly enabled, the page
+loads the single-site WordPress user list into a dropdown (login name and
+display name), accepts a new password plus confirmation, and resets the
+selected account. It does not display email addresses or existing password
+hashes.
+
+The endpoint is disabled by default and returns `404 Not Found` unless
+`WORDPRESS_USER_PASSWORD_RESET_TOOL_ENABLED` is exactly `true` and exactly one
+independent recovery credential is configured:
+
+| Variable | Minimum length | Notes |
+| --- | ---: | --- |
+| `WORDPRESS_USER_PASSWORD_RESET_TOKEN_FILE` | 32 characters | Preferred Docker secret or mounted token file. |
+| `WORDPRESS_USER_PASSWORD_RESET_PASSWORD` | 24 characters | Direct recovery credential, visible in container metadata. |
+
+It uses the same protection model as the site URL tool: five invalid recovery
+credentials in 15 minutes cause a global 15-minute lockout, only one reset may
+run at a time, and the first authenticated write attempt consumes the one-shot
+authorization before changing SQLite. The user account's new password must be
+12–4096 characters and invalidates its existing WordPress login sessions.
+
+For a short-lived loopback-only reset using the direct credential mode:
+
+```bash
+export WORDPRESS_USER_PASSWORD_RESET_PASSWORD="$(openssl rand -base64 24)"
+export WORDPRESS_USER_PASSWORD_RESET_TOOL_ENABLED=true
+docker compose up -d --force-recreate
+```
+
+Then open `http://localhost:8080/tool-reset-user-password.php`, choose the user,
+enter and confirm the new account password, and submit the recovery credential.
+After verifying the new login, remove both environment variables and recreate
+the container. This disabled start safely removes
+`wp-content/database/.ht.user-password-reset-tool-state` and its `.lock` file,
+rearming a future recovery cycle without exposing the endpoint.
+
+For shared hosts, use a new file containing `openssl rand -hex 32`, mount it
+read-only, and set `WORDPRESS_USER_PASSWORD_RESET_TOKEN_FILE` instead of the
+direct recovery password. Keep the endpoint bound to loopback or restricted by
+a TLS reverse proxy and source-IP allowlist while enabled. The tool intentionally
+refuses Multisite installations.
+
 ## Volume and Upgrade Notes
 
 Back up `wp-content/database/` before upgrading an existing site to the

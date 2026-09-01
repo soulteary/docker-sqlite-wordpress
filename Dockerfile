@@ -156,6 +156,11 @@ COPY sqlite-database-integration-loader.php ${WORDPRESS_PREPARE_DIR}/wp-content/
 # It returns 404 unless explicitly enabled with one strong credential.
 COPY tool-update-site-url.php ${WORDPRESS_PREPARE_DIR}/tool-update-site-url.php
 
+# Disabled-by-default emergency endpoint for selecting a local WordPress user
+# and resetting its password. It has its own enable switch, credential, and
+# persistent one-shot authorization state.
+COPY tool-reset-user-password.php ${WORDPRESS_PREPARE_DIR}/tool-reset-user-password.php
+
 # Self-healing entrypoint: the stock WordPress entrypoint only seeds a mounted
 # volume when it is empty, so an already-initialized/old volume never receives
 # the SQLite drop-in (wp-content/db.php) and WordPress falls back to MySQL
@@ -203,6 +208,7 @@ RUN test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-inte
     test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-local-core-update.php" && \
     test -s "/usr/src/wordpress-upgrades/wordpress-${WORDPRESS_VERSION}-no-content.zip" && \
     test -f "${WORDPRESS_PREPARE_DIR}/tool-update-site-url.php" && \
+    test -f "${WORDPRESS_PREPARE_DIR}/tool-reset-user-password.php" && \
     grep -q 'SQLITE_DB_DROPIN_VERSION' "${WORDPRESS_PREPARE_DIR}/wp-content/db.php" && \
     ! grep -q '{SQLITE_IMPLEMENTATION_FOLDER_PATH}' "${WORDPRESS_PREPARE_DIR}/wp-content/db.php"
 

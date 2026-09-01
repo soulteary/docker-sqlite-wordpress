@@ -19,6 +19,13 @@ services:
       WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED: "${WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED:-false}"
       WORDPRESS_SITE_URL_UPDATE_PASSWORD: "${WORDPRESS_SITE_URL_UPDATE_PASSWORD:-}"
 
+      # Emergency local user password reset. Enable only for one short-lived
+      # reset session, then remove both variables and recreate the container.
+      # `export WORDPRESS_USER_PASSWORD_RESET_PASSWORD="$(openssl rand -base64 24)"`
+      # `export WORDPRESS_USER_PASSWORD_RESET_TOOL_ENABLED=true`
+      WORDPRESS_USER_PASSWORD_RESET_TOOL_ENABLED: "${WORDPRESS_USER_PASSWORD_RESET_TOOL_ENABLED:-false}"
+      WORDPRESS_USER_PASSWORD_RESET_PASSWORD: "${WORDPRESS_USER_PASSWORD_RESET_PASSWORD:-}"
+
       # The matching checksummed WordPress core package is used by the normal
       # updater by default. Set the exact value false to require remote packages.
       WORDPRESS_LOCAL_CORE_UPDATE_ENABLED: "${WORDPRESS_LOCAL_CORE_UPDATE_ENABLED:-true}"
@@ -27,6 +34,7 @@ services:
       # this line and the service/top-level secrets blocks below. Leave PASSWORD
       # unset or empty: TOKEN_FILE and PASSWORD are mutually exclusive.
       # WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE: /run/secrets/site-url-update-token
+      # WORDPRESS_USER_PASSWORD_RESET_TOKEN_FILE: /run/secrets/user-password-reset-token
     # secrets:
     #   - site-url-update-token
     volumes:

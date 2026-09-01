@@ -43,6 +43,7 @@ docker run --rm --platform "${platform}" --entrypoint bash "${image}" -ceu '
   test -f /usr/src/wordpress/wp-content/mu-plugins/sqlite-local-core-update.php
   test -f /usr/src/wordpress/wp-content/mu-plugins/sqlite-select-id-key-fix.php
   test -f /usr/src/wordpress/tool-update-site-url.php
+  test -f /usr/src/wordpress/tool-reset-user-password.php
   test -s "${package}"
   test -s "${package}.sha256"
   test "$(sha256sum "${package}" | awk "{print \$1}")" = "$(cat "${package}.sha256")"
@@ -54,6 +55,7 @@ docker run --rm --platform "${platform}" --entrypoint bash "${image}" -ceu '
   php -l /usr/src/wordpress/wp-content/db.php
   php -l /usr/src/wordpress/wp-content/mu-plugins/sqlite-local-core-update.php
   php -l /usr/src/wordpress/tool-update-site-url.php
+  php -l /usr/src/wordpress/tool-reset-user-password.php
   if [[ "${expected_parser}" == native ]]; then
     test -s /usr/local/lib/php/extensions/wp_mysql_parser.so
   else
@@ -133,3 +135,7 @@ docker run --rm --platform "${platform}" "${image}" php -r '
 docker run --rm --platform "${platform}" \
 	--volume "${repo_root}/tests/image-smoke-site-url.php:/tmp/image-smoke-site-url.php:ro" \
 	"${image}" php /tmp/image-smoke-site-url.php
+
+docker run --rm --platform "${platform}" \
+	--volume "${repo_root}/tests/image-smoke-user-password.php:/tmp/image-smoke-user-password.php:ro" \
+	"${image}" php /tmp/image-smoke-user-password.php

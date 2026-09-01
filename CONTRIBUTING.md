@@ -102,6 +102,7 @@ bash tests/test-validate-release.sh
 php tests/test-sqlite-local-core-update.php
 php tests/test-sqlite-select-id-key-fix.php
 php tests/test-tool-update-site-url.php
+php tests/test-tool-reset-user-password.php
 ./scripts/validate-release.sh 2026.09.01-r1
 ```
 
@@ -122,7 +123,8 @@ docker compose config --quiet
 CI additionally lints every PHP and shell file, runs ShellCheck and actionlint,
 and smoke-tests amd64, native arm64, and the 32-bit ARM pure-PHP fallback when
 packaged runtime files change. Changes to
-`tool-update-site-url.php`, its entrypoint state handling, or its documentation
+`tool-update-site-url.php`, `tool-reset-user-password.php`, their entrypoint
+state handling, or their documentation
 must preserve these security properties:
 
 - the endpoint is a 404 unless the exact enable switch and one valid credential
@@ -143,6 +145,10 @@ recovery smoke test used by CI:
 docker run --rm \
   --volume "${PWD}/tests/image-smoke-site-url.php:/tmp/image-smoke-site-url.php:ro" \
   soulteary/sqlite-wordpress:dev php /tmp/image-smoke-site-url.php
+
+docker run --rm \
+  --volume "${PWD}/tests/image-smoke-user-password.php:/tmp/image-smoke-user-password.php:ro" \
+  soulteary/sqlite-wordpress:dev php /tmp/image-smoke-user-password.php
 ```
 
 ### Verifying Key Functionality
@@ -168,6 +174,9 @@ docker exec -it <container> ls -l /var/www/html/wp-content/mu-plugins/
 - Whether `/tool-update-site-url.php` is a 404 by default, accepts each
   documented credential mode when enabled, updates both options atomically, and
   becomes a 404 again immediately after one authenticated write attempt.
+- Whether `/tool-reset-user-password.php` is a 404 by default, lists all
+  single-site users when enabled, resets only the selected account, invalidates
+  its previous password, and becomes a 404 after one authenticated write.
 
 ## Reporting Issues
 

@@ -28,6 +28,14 @@ if [ -n "${WORDPRESS_SITE_URL_UPDATE_TOKEN_FILE:-}" ] \
 	unset resolved_site_url_update_token
 fi
 
+if [ -n "${WORDPRESS_USER_PASSWORD_RESET_TOKEN_FILE:-}" ] \
+	&& [ -f "${WORDPRESS_USER_PASSWORD_RESET_TOKEN_FILE}" ] \
+	&& [ -r "${WORDPRESS_USER_PASSWORD_RESET_TOKEN_FILE}" ]; then
+	resolved_user_password_reset_token="$(< "${WORDPRESS_USER_PASSWORD_RESET_TOKEN_FILE}")"
+	export SQLITE_WORDPRESS_USER_PASSWORD_RESET_TOKEN_RESOLVED="${resolved_user_password_reset_token}"
+	unset resolved_user_password_reset_token
+fi
+
 # Run the stock entrypoint's setup so it performs its volume seeding /
 # wp-config generation but does NOT start Apache/php-fpm. The stock script only
 # runs that setup when invoked as apache2*/php-fpm or under the name
@@ -43,15 +51,20 @@ if [ -d "$src_content" ] && [ -d "$DOCROOT" ]; then
 
 	# Keep the disabled-by-default recovery endpoint available on existing
 	# volumes too. Never follow a persisted symlink while copying as root.
-	managed_root_file="tool-update-site-url.php"
-	if [ -f "${WORDPRESS_PREPARE_DIR}/${managed_root_file}" ]; then
-		if [ -L "${DOCROOT}/${managed_root_file}" ] || ! cmp -s "${WORDPRESS_PREPARE_DIR}/${managed_root_file}" "${DOCROOT}/${managed_root_file}"; then
+	managed_root_files=(
+		"tool-update-site-url.php"
+		"tool-reset-user-password.php"
+	)
+	for managed_root_file in "${managed_root_files[@]}"; do
+		if [ -f "${WORDPRESS_PREPARE_DIR}/${managed_root_file}" ]; then
+			if [ -L "${DOCROOT}/${managed_root_file}" ] || ! cmp -s "${WORDPRESS_PREPARE_DIR}/${managed_root_file}" "${DOCROOT}/${managed_root_file}"; then
+				rm -f "${DOCROOT}/${managed_root_file}"
+				cp -f "${WORDPRESS_PREPARE_DIR}/${managed_root_file}" "${DOCROOT}/${managed_root_file}"
+			fi
+		else
 			rm -f "${DOCROOT}/${managed_root_file}"
-			cp -f "${WORDPRESS_PREPARE_DIR}/${managed_root_file}" "${DOCROOT}/${managed_root_file}"
 		fi
-	else
-		rm -f "${DOCROOT}/${managed_root_file}"
-	fi
+	done
 
 	# The SQLite drop-in itself. Without this file WordPress uses MySQL.
 	if [ -f "$src_content/db.php" ]; then
@@ -214,9 +227,16 @@ if [ -d "$src_content" ] && [ -d "$DOCROOT" ]; then
 	# SQLite database. Keep it while the exact enable switch remains active so a
 	# container restart cannot reopen the endpoint. A deliberately disabled start
 	# clears the latch and rearms a future enable cycle.
-	recovery_state_file="$dst_content/database/.ht.site-url-update-tool-state"
-	recovery_lock_file="${recovery_state_file}.lock"
-	if [ "${WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED:-}" != 'true' ]; then
+	clear_recovery_state_if_disabled() {
+		local recovery_enabled="$1"
+		local recovery_state_file="$2"
+		local recovery_lock_file
+		local recovery_path
+
+		recovery_lock_file="${recovery_state_file}.lock"
+		if [ "${recovery_enabled}" = 'true' ]; then
+			return
+		fi
 		for recovery_path in "$recovery_state_file" "$recovery_lock_file"; do
 			if [ -e "$recovery_path" ] || [ -L "$recovery_path" ]; then
 				if [ -d "$recovery_path" ] && [ ! -L "$recovery_path" ]; then
@@ -226,7 +246,13 @@ if [ -d "$src_content" ] && [ -d "$DOCROOT" ]; then
 				rm -f -- "$recovery_path"
 			fi
 		done
-	fi
+	}
+	clear_recovery_state_if_disabled \
+		"${WORDPRESS_SITE_URL_UPDATE_TOOL_ENABLED:-false}" \
+		"$dst_content/database/.ht.site-url-update-tool-state"
+	clear_recovery_state_if_disabled \
+		"${WORDPRESS_USER_PASSWORD_RESET_TOOL_ENABLED:-false}" \
+		"$dst_content/database/.ht.user-password-reset-tool-state"
 
 	# Best-effort ownership/permissions so www-data can create/write the DB.
 	if [ "$(id -u)" = '0' ]; then
@@ -236,10 +262,10 @@ if [ -d "$src_content" ] && [ -d "$DOCROOT" ]; then
 		group="${group#\#}"
 		# Keep the security-sensitive recovery endpoint root-owned and read-only
 		# to the web process. WordPress-owned content remains writable as before.
-		chown root:root "${DOCROOT}/${managed_root_file}" 2>/dev/null || true
+		chown root:root "${managed_root_files[@]/#/${DOCROOT}/}" 2>/dev/null || true
 		chown -R "$user:$group" "$dst_content/db.php" "$dst_content/mu-plugins" "$dst_content/database" 2>/dev/null || true
 	fi
-	chmod 644 "${DOCROOT}/${managed_root_file}" 2>/dev/null || true
+	chmod 644 "${managed_root_files[@]/#/${DOCROOT}/}" 2>/dev/null || true
 	chmod 755 "$dst_content/database" 2>/dev/null || true
 	chmod 640 "$dst_content/database/.ht.sqlite" 2>/dev/null || true
 fi
