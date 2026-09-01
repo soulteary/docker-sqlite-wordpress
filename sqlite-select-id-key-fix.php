@@ -1,9 +1,11 @@
 <?php
 /**
  * Plugin Name: SQLite SELECT id key case fix
+ * Plugin URI: https://github.com/soulteary/docker-sqlite-wordpress
  * Description: Restores the column-name casing written in a query (e.g. "P.id") for ARRAY_A results, working around SQLite returning the real declared column name (e.g. "ID") for un-aliased columns.
  * Version: 1.0.0
  * Author: soulteary
+ * Author URI: https://soulteary.com
  *
  * Background:
  * WordPress' wp_posts table declares its primary key column as "ID". MySQL is

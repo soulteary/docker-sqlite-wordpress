@@ -40,7 +40,7 @@ authoritative control.
    php tests/test-sqlite-select-id-key-fix.php
    php tests/test-tool-update-site-url.php
    php tests/test-tool-reset-user-password.php
-   ./scripts/validate-release.sh 2026.09.01-r1
+   ./scripts/validate-release.sh 2026.09.02-r1
    ```
 
 4. Let pull-request CI test amd64, native arm64, and the 32-bit ARM pure-PHP
@@ -58,7 +58,7 @@ Do not let the GitHub Release form create a lightweight tag.
 ```bash
 git switch main
 git pull --ff-only
-release=2026.09.01-r1
+release=2026.09.02-r1
 git tag -a "${release}" -m "Release ${release}"
 test "$(git cat-file -t "refs/tags/${release}")" = tag
 git push origin "refs/tags/${release}"
@@ -71,8 +71,8 @@ the Actions page and do not start a second run while it is still active.
 The `Release` workflow builds each runtime platform once and publishes the same
 manifest digest to Docker Hub and GHCR under the immutable exact tag:
 
-- `soulteary/sqlite-wordpress:2026.09.01-r1`
-- `ghcr.io/soulteary/sqlite-wordpress:2026.09.01-r1`
+- `soulteary/sqlite-wordpress:2026.09.02-r1`
+- `ghcr.io/soulteary/sqlite-wordpress:2026.09.02-r1`
 
 BuildKit emits an SPDX SBOM and maximum-mode SLSA provenance for each platform.
 The merged index receives OCI version, source, revision, and license
@@ -133,7 +133,7 @@ manifest; an additional valid signature referrer does not change its digest.
 Set the exact tag once for all commands:
 
 ```bash
-release=2026.09.01-r1
+release=2026.09.02-r1
 ```
 
 1. Confirm both registries expose the same five runtime platforms, SBOM, and

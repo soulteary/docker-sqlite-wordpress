@@ -1,9 +1,11 @@
 <?php
 /**
  * Plugin Name: SQLite WordPress SMTP
+ * Plugin URI: https://github.com/soulteary/docker-sqlite-wordpress
  * Description: Configures wp_mail() through an optional SMTP transport with administrator settings and per-field environment overrides.
  * Version: 1.0.0
  * Author: soulteary
+ * Author URI: https://soulteary.com
  *
  * @package sqlite-wordpress-smtp
  */

@@ -1,9 +1,11 @@
 <?php
 /**
  * Plugin Name: SQLite WordPress Local Core Update
+ * Plugin URI: https://github.com/soulteary/docker-sqlite-wordpress
  * Description: Uses the core upgrade archive bundled with the container when WordPress offers the matching version.
  * Version: 1.0.1
  * Author: soulteary
+ * Author URI: https://soulteary.com
  * License: Apache-2.0
  */
 
