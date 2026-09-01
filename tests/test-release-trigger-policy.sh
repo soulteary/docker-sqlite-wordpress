@@ -11,7 +11,7 @@ if grep -Eq '^[[:space:]]+push:$' "${workflow}"; then
 	exit 1
 fi
 
-grep -Fq 'ref: ${{ github.event.release.tag_name || github.ref }}' "${workflow}"
+grep -Fq "ref: \${{ github.event.release.tag_name || github.ref }}" "${workflow}"
 grep -Fq "RELEASE_EVENT_TAG: \${{ github.event.release.tag_name || '' }}" "${workflow}"
 grep -Eq '^[[:space:]]+tag\|commit\)' "${workflow}"
 grep -Fq 'RELEASE_REF_PROTECTED' "${workflow}"
