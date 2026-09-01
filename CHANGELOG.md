@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+## [2026.09.02-r2] - 2026-09-02
+
+### Fixed
+
+- Prepared a new immutable revision after the GitHub Releases web form created
+  `2026.09.02-r1` as a lightweight tag. The release workflow rejected that tag
+  during annotated-tag preflight, before registry login or image construction.
+- Aligned the image version, validation examples, deployment examples, and
+  release documentation on the same `2026.09.02-r2` candidate.
+
+### Changed
+
+- Simplified fresh publication to one GitHub web action: publishing a Release
+  now creates or selects its protected tag and automatically starts the image
+  workflow.
+- Accepted protected lightweight and annotated CalVer tags under the same
+  immutable-tag, `main` ancestry, version, and registry preflight checks.
+- Kept manual workflow dispatch for explicit recovery while removing the tag
+  push trigger, preventing duplicate runs when an existing annotated tag is
+  later attached to a GitHub Release.
+
+### Release status
+
+- Prepared as the next immutable release for 2026-09-02. Until its protected
+  annotated tag is published and verified, `2026.09.01-r1` remains the current
+  complete release.
+
+### Release notes
+
+- This revision contains the SMTP, OwlMail, user password reset, page
+  performance, and project-owned MU plugin metadata changes recorded in the
+  retained `2026.09.02-r1` source release below.
+
 ## [2026.09.02-r1] - 2026-09-02
 
 ### Added
@@ -34,9 +67,10 @@
 
 ### Release status
 
-- Prepared as the first immutable release for 2026-09-02. Until its protected
-  annotated tag is published and verified, `2026.09.01-r1` remains the current
-  complete release.
+- The GitHub source release was created with a lightweight tag. The protected
+  release workflow rejected it during annotated-tag preflight, before registry
+  login or image construction. Do not use `2026.09.02-r1` as a deployable image
+  release.
 
 ### Upgrade notes
 
@@ -207,7 +241,8 @@
 - SQLite Database Integration 3.0.0 uses WAL journaling by default; keep the database, `-wal`, and `-shm` files on the same persistent volume.
 - The native `wp_mysql_parser` extension is built for amd64 and arm64. Other published platforms use the integration's pure-PHP parser fallback.
 
-[Unreleased]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.09.02-r1...HEAD
+[Unreleased]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.09.02-r2...HEAD
+[2026.09.02-r2]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.09.02-r1...2026.09.02-r2
 [2026.09.02-r1]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.09.01-r1...2026.09.02-r1
 [2026.09.01-r1]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.08.31-r3...2026.09.01-r1
 [2026.08.31-r3]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.08.31-r2...2026.08.31-r3
