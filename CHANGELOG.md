@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Marked `2026.09.02-r2` as published after both registries, supply-chain
+  evidence, signatures, and mutable aliases passed verification; switched the
+  Quick Start and Compose example from a local `main` build to the immutable
+  release image.
+- Corrected the release and contribution guides to consistently describe
+  protected lightweight and annotated tag support and the GitHub Release
+  publication order.
+
 ## [2026.09.02-r2] - 2026-09-02
 
 ### Fixed
@@ -10,7 +20,7 @@
   `2026.09.02-r1` as a lightweight tag. The release workflow rejected that tag
   during annotated-tag preflight, before registry login or image construction.
 - Aligned the image version, validation examples, deployment examples, and
-  release documentation on the same `2026.09.02-r2` candidate.
+  release documentation on the same `2026.09.02-r2` release.
 
 ### Changed
 
@@ -25,9 +35,10 @@
 
 ### Release status
 
-- Prepared as the next immutable release for 2026-09-02. Until its protected
-  annotated tag is published and verified, `2026.09.01-r1` remains the current
-  complete release.
+- Published to Docker Hub and GHCR as matching five-platform indexes at
+  `sha256:9a5ceb20d80485de3e71bfe4a454f913408c6cdc995df17c2805e90fea5a049a`.
+  Per-platform SBOM and provenance evidence and both registry signatures were
+  verified before the `2026.09.02` and `latest` aliases were promoted.
 
 ### Release notes
 

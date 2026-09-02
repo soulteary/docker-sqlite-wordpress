@@ -17,10 +17,11 @@ reviewers when an explicit publication approval is desired.
 
 Repository rulesets cannot be installed by a pull request. An administrator
 must configure and verify this policy in **Settings → Rules → Rulesets**. The
-workflow independently requires GitHub's `ref_protected` signal and rejects
-branch dispatches, lightweight tags, tags outside `main`, and tags whose target
-does not match the checked-out commit. Server-side tag protection remains the
-authoritative control.
+workflow independently requires GitHub's `ref_protected` signal and accepts both
+lightweight (`commit`) tags created by the Releases form and existing annotated
+(`tag`) tags. It rejects branch dispatches, tags whose target commit is not on
+`main`, and tags whose target does not match the checked-out commit. Server-side
+tag protection remains the authoritative control.
 
 ## Prepare
 
@@ -67,7 +68,8 @@ release-triggered run is active.
 
 For an annotated tag, create and push it first, then select that existing tag
 in the GitHub Releases form. A tag push alone no longer starts publication;
-publishing the GitHub Release is the single fresh-release trigger.
+publishing the GitHub Release is the normal automatic fresh-release trigger.
+Manual dispatch remains the explicit operator path described below.
 
 The `Release` workflow builds each runtime platform once and publishes the same
 manifest digest to Docker Hub and GHCR under the immutable exact tag:
@@ -171,8 +173,10 @@ release=2026.09.02-r2
    ./scripts/verify-published-release.sh "${release}"
    ```
 
-   Create the GitHub Release from the existing annotated tag only after all
-   image checks succeed.
+   The GitHub Release already exists at this stage because its `published`
+   event starts normal fresh publication. Record the verified digest in the
+   post-release documentation and announcement; do not create another tag or
+   Release.
 
 4. If the release pull request carried the `release-availability: pending`
    README marker and local-build Compose configuration, open a documentation

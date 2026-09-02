@@ -200,14 +200,16 @@ Please search for existing issues before opening a new one. When reporting a bug
 
 - **Dockerfile**: Keep the multi-stage build structure clear; keep necessary comments for non-obvious trade-offs (such as skipping the Rust build per platform).
 - **PHP** (`sqlite-select-id-key-fix.php`, etc.): Follow the WordPress coding standards and keep behavior conservative and safe to fall back on, avoiding destructive changes for cases that cannot be fully reasoned about.
-- **YAML workflows**: Keep pull-request validation and the tag-driven `Release` workflow consistent with the supported platform matrix and release policy.
+- **YAML workflows**: Keep pull-request validation and the release-triggered `Release` workflow consistent with the supported platform matrix and release policy.
 - Comments should explain intent and constraints, not restate what the code already expresses.
 
 ## Versioning and Releases
 
-Releases are triggered by maintainers pushing a protected annotated tag in the
-CalVer form `YYYY.MM.DD-rN`. The workflow publishes the same signed multi-arch
-manifest under an immutable exact tag to
+Normal releases are triggered when maintainers publish a GitHub Release for a
+protected CalVer tag in the form `YYYY.MM.DD-rN`. The Releases form may create a
+protected lightweight tag or select an existing protected annotated tag; a tag
+push alone does not publish images. The workflow publishes the same signed
+multi-arch manifest under an immutable exact tag to
 [Docker Hub](https://hub.docker.com/r/soulteary/sqlite-wordpress) and
 [GHCR](https://github.com/soulteary/docker-sqlite-wordpress/pkgs/container/sqlite-wordpress),
 then separately promotes the mutable date and `latest` aliases. Component
