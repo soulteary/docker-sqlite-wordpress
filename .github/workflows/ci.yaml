@@ -102,6 +102,7 @@ jobs:
           echo "release_version=${release_version}" >> "${GITHUB_OUTPUT}"
 
       - name: Verify pinned WordPress base image
+        if: steps.changes.outputs.image_changed == 'true'
         run: >-
           ci-recipes docker-sqlite-wordpress validate-release
           "${{ steps.release.outputs.release_version }}"
