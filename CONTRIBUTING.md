@@ -98,12 +98,12 @@ Run the complete fast test set before opening a pull request:
 ```bash
 bash tests/test-entrypoint-reconcile.sh
 bash tests/test-documentation.sh
-bash tests/test-validate-release.sh
 php tests/test-sqlite-local-core-update.php
 php tests/test-sqlite-select-id-key-fix.php
 php tests/test-tool-update-site-url.php
 php tests/test-tool-reset-user-password.php
-./scripts/validate-release.sh 2026.09.02-r2
+go install github.com/soulteary/ci-recipes/cmd/ci-recipes@6e790adf553ecff9f5ba5a3d0beeb9a9256a29ee
+ci-recipes docker-sqlite-wordpress validate-release 2026.09.02-r2
 ```
 
 To reproduce the remaining lint and configuration checks:

@@ -17,6 +17,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  CI_RECIPES_VERSION: 6e790adf553ecff9f5ba5a3d0beeb9a9256a29ee
   REGISTRY_IMAGE: soulteary/sqlite-wordpress
   GHCR_IMAGE: ghcr.io/soulteary/sqlite-wordpress
 
@@ -38,6 +39,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ github.event.release.tag_name || github.ref }}
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.x
+          cache: false
+
+      - name: Install CI recipes
+        env:
+          GOBIN: ${{ runner.temp }}/ci-recipes-bin
+        run: |
+          go install "github.com/soulteary/ci-recipes/cmd/ci-recipes@${CI_RECIPES_VERSION}"
+          echo "${GOBIN}" >> "${GITHUB_PATH}"
 
       - name: Validate release tag and project versions
         id: release
@@ -83,7 +97,7 @@ jobs:
             exit 1
           fi
 
-          ./scripts/validate-release.sh "${RELEASE_REF_NAME}"
+          ci-recipes docker-sqlite-wordpress validate-release "${RELEASE_REF_NAME}"
           echo "version=${RELEASE_REF_NAME}" >> "${GITHUB_OUTPUT}"
           echo "source_sha=${source_sha}" >> "${GITHUB_OUTPUT}"
 
@@ -106,7 +120,10 @@ jobs:
       - name: Verify pinned WordPress base image
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
-        run: ./scripts/validate-release.sh "${RELEASE_VERSION}" --verify-upstream
+        run: >-
+          ci-recipes docker-sqlite-wordpress validate-release
+          "${RELEASE_VERSION}"
+          --verify-upstream
 
       - name: Select fresh or resumable publication
         id: registry
@@ -297,6 +314,19 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.x
+          cache: false
+
+      - name: Install CI recipes
+        env:
+          GOBIN: ${{ runner.temp }}/ci-recipes-bin
+        run: |
+          go install "github.com/soulteary/ci-recipes/cmd/ci-recipes@${CI_RECIPES_VERSION}"
+          echo "${GOBIN}" >> "${GITHUB_PATH}"
+
       - name: Download digests
         if: env.RESUME_EXISTING != 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -422,12 +452,12 @@ jobs:
               jq -Rsc 'split("\n") | map(select(length > 0))' <<< "${expected_platforms}"
             )"
             sbom="$(docker buildx imagetools inspect "${image}:${RELEASE_VERSION}" --format '{{ json .SBOM }}')"
-            if ! bash ./scripts/validate-buildx-evidence.sh SPDX "${expected_evidence_platforms}" <<< "${sbom}"; then
+            if ! ci-recipes docker-sqlite-wordpress validate-buildx-evidence SPDX "${expected_evidence_platforms}" <<< "${sbom}"; then
               echo "::error::Incomplete per-platform SPDX SBOM for ${image}:${RELEASE_VERSION}."
               exit 1
             fi
             provenance="$(docker buildx imagetools inspect "${image}:${RELEASE_VERSION}" --format '{{ json .Provenance }}')"
-            if ! bash ./scripts/validate-buildx-evidence.sh SLSA "${expected_evidence_platforms}" <<< "${provenance}"; then
+            if ! ci-recipes docker-sqlite-wordpress validate-buildx-evidence SLSA "${expected_evidence_platforms}" <<< "${provenance}"; then
               echo "::error::Incomplete per-platform SLSA provenance for ${image}:${RELEASE_VERSION}."
               exit 1
             fi
@@ -457,7 +487,7 @@ jobs:
           done
 
           for image in "${REGISTRY_IMAGE}" "${GHCR_IMAGE}"; do
-            bash ./scripts/verify-cosign-signature.sh \
+            ci-recipes docker-sqlite-wordpress verify-cosign-signature \
               "${image}@${MANIFEST_DIGEST}" \
               "${certificate_identity}" \
               "${certificate_issuer}"

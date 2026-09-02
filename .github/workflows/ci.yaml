@@ -10,6 +10,9 @@ on:
 permissions:
   contents: read
 
+env:
+  CI_RECIPES_VERSION: 6e790adf553ecff9f5ba5a3d0beeb9a9256a29ee
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -25,6 +28,19 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.x
+          cache: false
+
+      - name: Install CI recipes
+        env:
+          GOBIN: ${{ runner.temp }}/ci-recipes-bin
+        run: |
+          go install "github.com/soulteary/ci-recipes/cmd/ci-recipes@${CI_RECIPES_VERSION}"
+          echo "${GOBIN}" >> "${GITHUB_PATH}"
 
       - name: Install ShellCheck
         env:
@@ -58,7 +74,6 @@ jobs:
               .dockerignore \
               Dockerfile \
               docker-entrypoint-sqlite.sh \
-              scripts/validate-release.sh \
               sqlite-database-integration-loader.php \
               sqlite-diagnostics.php \
               sqlite-local-core-update.php \
@@ -83,8 +98,14 @@ jobs:
             echo "Expected IMAGE_VERSION in Dockerfile." >&2
             exit 1
           fi
-          ./scripts/validate-release.sh "${release_version}"
+          ci-recipes docker-sqlite-wordpress validate-release "${release_version}"
           echo "release_version=${release_version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify pinned WordPress base image
+        run: >-
+          ci-recipes docker-sqlite-wordpress validate-release
+          "${{ steps.release.outputs.release_version }}"
+          --verify-upstream
 
       - name: Lint shell scripts
         run: |
@@ -154,9 +175,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
-      - name: Verify pinned WordPress base image
-        run: ./scripts/validate-release.sh "${{ needs.validate.outputs.release_version }}" --verify-upstream
 
       - name: Set up QEMU
         if: ${{ matrix.qemu }}
