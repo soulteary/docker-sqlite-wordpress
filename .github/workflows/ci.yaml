@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 env:
-  CI_RECIPES_VERSION: 6e790adf553ecff9f5ba5a3d0beeb9a9256a29ee
+  CI_RECIPES_VERSION: 3d4ee1d95f345b48560ee7c39cb1d469342c4462
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

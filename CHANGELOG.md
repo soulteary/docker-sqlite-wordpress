@@ -20,7 +20,8 @@
   `wp-content/mu-plugins/` installation paths and runtime behavior.
 - Replaced repository-local CI validation Bash scripts with the SHA-pinned
   `ci-recipes` Go CLI and moved the architecture-independent upstream image
-  check out of the three-platform smoke-test matrix.
+  check out of the three-platform smoke-test matrix. Updated the pinned recipe
+  to recognize both the consolidated and legacy MU-plugin source layouts.
 - Marked `2026.09.02-r2` as published after both registries, supply-chain
   evidence, signatures, and mutable aliases passed verification; switched the
   Quick Start and Compose example from a local `main` build to the immutable
