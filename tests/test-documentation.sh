@@ -165,7 +165,7 @@ if [[ ! "${release_version}" =~ ^[0-9]{4}\.(0[1-9]|1[0-2])\.(0[1-9]|[12][0-9]|3[
 fi
 
 for release_doc in CONTRIBUTING.md RELEASING.md; do
-	if ! grep -Fq "./scripts/validate-release.sh ${release_version}" "${release_doc}"; then
+	if ! grep -Fq "ci-recipes docker-sqlite-wordpress validate-release ${release_version}" "${release_doc}"; then
 		echo "${release_doc} does not use image release ${release_version}" >&2
 		failures=$((failures + 1))
 	fi

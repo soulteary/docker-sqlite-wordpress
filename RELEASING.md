@@ -36,12 +36,12 @@ tag protection remains the authoritative control.
 
    ```bash
    bash tests/test-entrypoint-reconcile.sh
-   bash tests/test-validate-release.sh
    php tests/test-sqlite-local-core-update.php
    php tests/test-sqlite-select-id-key-fix.php
    php tests/test-tool-update-site-url.php
    php tests/test-tool-reset-user-password.php
-   ./scripts/validate-release.sh 2026.09.02-r2
+   go install github.com/soulteary/ci-recipes/cmd/ci-recipes@6e790adf553ecff9f5ba5a3d0beeb9a9256a29ee
+   ci-recipes docker-sqlite-wordpress validate-release 2026.09.02-r2
    ```
 
 4. Let pull-request CI test amd64, native arm64, and the 32-bit ARM pure-PHP
@@ -170,7 +170,7 @@ release=2026.09.02-r2
    availability gate:
 
    ```bash
-   ./scripts/verify-published-release.sh "${release}"
+   ci-recipes docker-sqlite-wordpress verify-published-release "${release}"
    ```
 
    The GitHub Release already exists at this stage because its `published`
@@ -181,8 +181,8 @@ release=2026.09.02-r2
 4. If the release pull request carried the `release-availability: pending`
    README marker and local-build Compose configuration, open a documentation
    follow-up that removes the marker and switches Compose to the exact published
-   tag. `tests/test-release-availability.sh` rejects that transition until the
-   Git tag exists and Docker Hub and GHCR expose the same manifest digest.
+   tag only after the registry availability gate confirms that the Git tag exists
+   and Docker Hub and GHCR expose the same manifest digest.
 
 Never force-push, delete, or retarget a published release tag. If anything in
 the image or its evidence must change, publish a new CalVer revision. Rerun a
