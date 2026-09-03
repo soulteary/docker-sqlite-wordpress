@@ -40,8 +40,8 @@ tag protection remains the authoritative control.
    php tests/test-sqlite-select-id-key-fix.php
    php tests/test-tool-update-site-url.php
    php tests/test-tool-reset-user-password.php
-   go install github.com/soulteary/ci-recipes/cmd/ci-recipes@6e790adf553ecff9f5ba5a3d0beeb9a9256a29ee
-   ci-recipes docker-sqlite-wordpress validate-release 2026.09.02-r2
+   go install github.com/soulteary/ci-recipes/cmd/ci-recipes@83ccd6f83d7e7ef40f5d6faf2e11960f1de74a78
+   ci-recipes docker-sqlite-wordpress validate-release 2026.09.03-r1
    ```
 
 4. Let pull-request CI test amd64, native arm64, and the 32-bit ARM pure-PHP
@@ -57,7 +57,7 @@ Publish from the GitHub Releases page after the release pull request is merged
 and `main` CI succeeds:
 
 1. Open **Releases → Draft a new release**.
-2. Enter `2026.09.02-r2` in **Choose a tag**, choose **Create new tag**, and
+2. Enter `2026.09.03-r1` in **Choose a tag**, choose **Create new tag**, and
    target the current `main` branch.
 3. Generate and review the release notes, then select **Publish release**.
 
@@ -74,8 +74,8 @@ Manual dispatch remains the explicit operator path described below.
 The `Release` workflow builds each runtime platform once and publishes the same
 manifest digest to Docker Hub and GHCR under the immutable exact tag:
 
-- `soulteary/sqlite-wordpress:2026.09.02-r2`
-- `ghcr.io/soulteary/sqlite-wordpress:2026.09.02-r2`
+- `soulteary/sqlite-wordpress:2026.09.03-r1`
+- `ghcr.io/soulteary/sqlite-wordpress:2026.09.03-r1`
 
 BuildKit emits an SPDX SBOM and maximum-mode SLSA provenance for each platform.
 The merged index receives OCI version, source, revision, and license
@@ -136,7 +136,7 @@ manifest; an additional valid signature referrer does not change its digest.
 Set the exact tag once for all commands:
 
 ```bash
-release=2026.09.02-r2
+release=2026.09.03-r1
 ```
 
 1. Confirm both registries expose the same five runtime platforms, SBOM, and

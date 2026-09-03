@@ -8,7 +8,7 @@ define( 'ABSPATH', __DIR__ );
 function add_filter() {}
 function add_action() {}
 
-require dirname( __DIR__ ) . '/sqlite-select-id-key-fix.php';
+require dirname( __DIR__ ) . '/plugins/sqlite-select-id-key-fix.php';
 
 /**
  * @param mixed  $expected Expected value.

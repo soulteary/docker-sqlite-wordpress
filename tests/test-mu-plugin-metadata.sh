@@ -11,6 +11,10 @@ if (( ${#project_mu_plugins[@]} == 0 )); then
 fi
 
 for plugin in "${project_mu_plugins[@]}"; do
+	if [[ "${plugin}" != plugins/*.php ]]; then
+		echo "Project-owned MU Plugin source must be stored under plugins/: ${plugin}" >&2
+		exit 1
+	fi
 	if [[ ! -f "${plugin}" ]]; then
 		echo "Project-owned MU Plugin source is missing: ${plugin}" >&2
 		exit 1
@@ -32,5 +36,10 @@ for plugin in "${project_mu_plugins[@]}"; do
 		exit 1
 	fi
 done
+
+if find . -maxdepth 1 -type f -name 'sqlite-*.php' -print -quit | grep -q .; then
+	echo "Project-owned MU Plugin sources must not be stored in the repository root." >&2
+	exit 1
+fi
 
 echo "Project-owned MU Plugin metadata is valid."

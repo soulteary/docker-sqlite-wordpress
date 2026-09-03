@@ -61,7 +61,7 @@ class Performance_Test_Admin_Bar {
 	}
 }
 
-require dirname( __DIR__ ) . '/sqlite-wordpress-performance.php';
+require dirname( __DIR__ ) . '/plugins/sqlite-wordpress-performance.php';
 
 function performance_test_assert_same( $expected, $actual, $label ) {
 	if ( $expected !== $actual ) {

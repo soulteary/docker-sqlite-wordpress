@@ -39,7 +39,7 @@ class WP_Error {
 class Core_Upgrader {}
 class Plugin_Upgrader {}
 
-require dirname( __DIR__ ) . '/sqlite-local-core-update.php';
+require dirname( __DIR__ ) . '/plugins/sqlite-local-core-update.php';
 
 function local_core_assert_same( $expected, $actual, $label ) {
 	if ( $expected !== $actual ) {

@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 env:
-  CI_RECIPES_VERSION: 6e790adf553ecff9f5ba5a3d0beeb9a9256a29ee
+  CI_RECIPES_VERSION: 83ccd6f83d7e7ef40f5d6faf2e11960f1de74a78
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -74,12 +74,7 @@ jobs:
               .dockerignore \
               Dockerfile \
               docker-entrypoint-sqlite.sh \
-              sqlite-database-integration-loader.php \
-              sqlite-diagnostics.php \
-              sqlite-local-core-update.php \
-              sqlite-select-id-key-fix.php \
-              sqlite-wordpress-performance.php \
-              sqlite-wordpress-smtp.php \
+              plugins \
               tool-reset-user-password.php \
               tool-update-site-url.php \
               tests/image-smoke.sh \

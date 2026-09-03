@@ -84,7 +84,7 @@ class SMTP_Test_Mailer {
 	}
 }
 
-require dirname( __DIR__ ) . '/sqlite-wordpress-smtp.php';
+require dirname( __DIR__ ) . '/plugins/sqlite-wordpress-smtp.php';
 
 function smtp_test_assert_same( $expected, $actual, $label ) {
 	if ( $expected !== $actual ) {

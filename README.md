@@ -4,13 +4,15 @@
 
 WordPress with SQLite, ready to use out of the box.
 
-> **Latest container release:**
-> [`2026.09.02-r2`](https://github.com/soulteary/docker-sqlite-wordpress/releases/tag/2026.09.02-r2)
-> is published to Docker Hub and GHCR as matching five-platform indexes at
+<!-- release-availability: pending -->
+> **Container release availability:** `2026.09.03-r1` is prepared but is not
+> published yet as a verified container image. The previous verified release,
+> [`2026.09.02-r2`](https://github.com/soulteary/docker-sqlite-wordpress/releases/tag/2026.09.02-r2),
+> remains available from Docker Hub and GHCR with matching manifest digest
 > `sha256:9a5ceb20d80485de3e71bfe4a454f913408c6cdc995df17c2805e90fea5a049a`.
-> The verified `2026.09.02` and `latest` aliases were promoted from the same
-> release. Pin the exact CalVer tag or manifest digest for reproducible
-> deployments.
+> Until the protected `2026.09.03-r1` tag succeeds in both registries, build
+> current `main` as shown in Quick Start. The existing `latest` alias still
+> represents the previous release and does not include this candidate's fixes.
 
 - Based on [official image](https://hub.docker.com/_/wordpress), Easier and more sustainable solution.
 - DockerHub Page: https://hub.docker.com/r/soulteary/sqlite-wordpress
@@ -59,26 +61,32 @@ docker exec -it <container> ls -l /var/www/html/wp-content/mu-plugins/
 
 ## Quick Start
 
-Pull the immutable CalVer release for reproducible deployments, or use the
-rolling `latest` alias when automatic version movement is intentional:
+Until `2026.09.03-r1` is published, build current `main` locally:
 
 ```bash
-# Docker Hub: use an immutable release
-docker pull soulteary/sqlite-wordpress:2026.09.02-r2
-# GHCR: use an immutable release
-docker pull ghcr.io/soulteary/sqlite-wordpress:2026.09.02-r2
-# Docker Hub: use latest
-docker pull soulteary/sqlite-wordpress
-# GHCR: use latest
-docker pull ghcr.io/soulteary/sqlite-wordpress:latest
+docker build -t sqlite-wordpress:main .
 ```
 
-Launch the published image on port `8080`:
+After the protected release workflow succeeds, pull the rolling tag for
+convenience or the immutable CalVer release for reproducible deployments:
+
+```bash
+# Docker Hub: use latest
+docker pull soulteary/sqlite-wordpress
+# Docker Hub: use an immutable release
+docker pull soulteary/sqlite-wordpress:2026.09.03-r1
+# GHCR: use latest
+docker pull ghcr.io/soulteary/sqlite-wordpress:latest
+# GHCR: use an immutable release
+docker pull ghcr.io/soulteary/sqlite-wordpress:2026.09.03-r1
+```
+
+Launch the locally built image on port `8080`:
 
 ```bash
 docker run --rm -it -p 127.0.0.1:8080:80 \
   -v "$(pwd)/wordpress:/var/www/html" \
-  soulteary/sqlite-wordpress:2026.09.02-r2
+  sqlite-wordpress:main
 ```
 
 You can also use docker compose to start wordpress:
@@ -87,7 +95,9 @@ You can also use docker compose to start wordpress:
 services:
 
   wordpress:
-    image: soulteary/sqlite-wordpress:2026.09.02-r2
+    build:
+      context: .
+    image: sqlite-wordpress:main
     restart: always
     ports:
       # Safe local default. Change this only when intentionally publishing the
@@ -97,7 +107,7 @@ services:
       - ./wordpress:/var/www/html
 ```
 
-Save the file as `docker-compose.yml` and execute `docker compose up -d`,
+Save the file as `docker-compose.yml` and execute `docker compose up --build`,
 then use a browser to access `localhost:8080`.
 
 ![](.github/ready-to-use.jpg)

@@ -1,10 +1,10 @@
 # plugin: https://github.com/WordPress/sqlite-database-integration
 # The optional native Rust extension `wp_mysql_parser` accelerates the MySQL
 # lexer/parser used by the SQLite driver. It requires the 3.0 monorepo layout.
-ARG IMAGE_VERSION=2026.09.02-r2
+ARG IMAGE_VERSION=2026.09.03-r1
 ARG IMAGE_REVISION=unknown
 ARG WORDPRESS_VERSION=7.1.0
-ARG WORDPRESS_IMAGE=wordpress:7.1.0-php8.5-apache@sha256:d05574507fdb46ad9be0c12a86c54c5e0603c282ea2d967f939081baf9665c6d
+ARG WORDPRESS_IMAGE=wordpress:7.1.0-php8.5-apache@sha256:397daa8a8816347e724362c2122129601eb0811fbaff0ce9b2b22c7b057a745d
 ARG SQLITE_DATABASE_INTEGRATION_VERSION=3.0.1
 ARG SQLITE_DATABASE_INTEGRATION_COMMIT=abf0dac137cf4e17866fea44b8a83d68b43792c4
 ARG RUSTUP_VERSION=1.29.0
@@ -114,7 +114,7 @@ LABEL org.opencontainers.image.authors="soulteary@gmail.com" \
       org.opencontainers.image.revision="${IMAGE_REVISION}" \
       org.opencontainers.image.licenses="Apache-2.0 AND GPL-2.0-or-later" \
       org.opencontainers.image.base.name="docker.io/library/wordpress:7.1.0-php8.5-apache" \
-      org.opencontainers.image.base.digest="sha256:d05574507fdb46ad9be0c12a86c54c5e0603c282ea2d967f939081baf9665c6d" \
+      org.opencontainers.image.base.digest="sha256:397daa8a8816347e724362c2122129601eb0811fbaff0ce9b2b22c7b057a745d" \
       io.soulteary.wordpress.version="${WORDPRESS_VERSION}" \
       io.soulteary.sqlite-integration.version="${SQLITE_DATABASE_INTEGRATION_VERSION}"
 
@@ -128,22 +128,22 @@ COPY --from=ext-builder /plugin ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/s
 # Companion must-use plugin: normalizes SELECT column-name casing (e.g. "P.id")
 # that SQLite otherwise returns as the declared column name (e.g. "ID"). Files
 # in the mu-plugins root are auto-loaded and cannot be deactivated.
-COPY sqlite-select-id-key-fix.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-select-id-key-fix.php
+COPY plugins/sqlite-select-id-key-fix.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-select-id-key-fix.php
 
 # Companion must-use plugin: read-only diagnostics page under the Tools menu
 # that surfaces the native parser / SQLite / environment / integration state.
 # Auto-loaded from the mu-plugins root and cannot be deactivated.
-COPY sqlite-diagnostics.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-diagnostics.php
+COPY plugins/sqlite-diagnostics.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-diagnostics.php
 
 # Optional SMTP transport with an administrator settings page and per-field
 # environment overrides. It is disabled by default and includes OwlMail-safe
 # defaults for the optional Compose integration.
-COPY sqlite-wordpress-smtp.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-wordpress-smtp.php
+COPY plugins/sqlite-wordpress-smtp.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-wordpress-smtp.php
 
 # Optional, disabled-by-default server performance display. Administrators or
 # an exact boolean environment override can expose generation time and PHP
 # memory usage in the toolbar and public page footer.
-COPY sqlite-wordpress-performance.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-wordpress-performance.php
+COPY plugins/sqlite-wordpress-performance.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-wordpress-performance.php
 
 # WordPress's official entrypoint intentionally leaves an initialized docroot
 # untouched. Bundle the exact pinned core as a no-content archive and let this
@@ -151,7 +151,7 @@ COPY sqlite-wordpress-performance.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plu
 # temporary copy of that local package.
 COPY --from=ext-builder /wordpress-core-no-content.zip /usr/src/wordpress-upgrades/wordpress-${WORDPRESS_VERSION}-no-content.zip
 COPY --from=ext-builder /wordpress-core-no-content.zip.sha256 /usr/src/wordpress-upgrades/wordpress-${WORDPRESS_VERSION}-no-content.zip.sha256
-COPY sqlite-local-core-update.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-local-core-update.php
+COPY plugins/sqlite-local-core-update.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-local-core-update.php
 
 # mu-plugins only auto-loads .php files in the mu-plugins root; it does NOT
 # recurse into subdirectories, so the plugin's own
@@ -159,7 +159,7 @@ COPY sqlite-local-core-update.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins
 # root-level loader requires that load.php to mount its admin UI (the SQLite
 # health-check / settings page under Settings). The SQLite driver itself loads
 # via wp-content/db.php and does not depend on this loader.
-COPY sqlite-database-integration-loader.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration-loader.php
+COPY plugins/sqlite-database-integration-loader.php ${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-integration-loader.php
 
 # Disabled-by-default emergency endpoint for repairing the database-backed
 # WordPress Address (`siteurl`) and Site Address (`home`) after a domain change.
