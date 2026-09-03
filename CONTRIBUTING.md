@@ -103,7 +103,7 @@ php tests/test-sqlite-select-id-key-fix.php
 php tests/test-tool-update-site-url.php
 php tests/test-tool-reset-user-password.php
 go install github.com/soulteary/ci-recipes/cmd/ci-recipes@6e790adf553ecff9f5ba5a3d0beeb9a9256a29ee
-ci-recipes docker-sqlite-wordpress validate-release 2026.09.02-r2
+ci-recipes docker-sqlite-wordpress validate-release 2026.09.03-r1
 ```
 
 To reproduce the remaining lint and configuration checks:
@@ -199,7 +199,10 @@ Please search for existing issues before opening a new one. When reporting a bug
 ## Code Style Conventions
 
 - **Dockerfile**: Keep the multi-stage build structure clear; keep necessary comments for non-obvious trade-offs (such as skipping the Rust build per platform).
-- **PHP** (`sqlite-select-id-key-fix.php`, etc.): Follow the WordPress coding standards and keep behavior conservative and safe to fall back on, avoiding destructive changes for cases that cannot be fully reasoned about.
+- **PHP plugins** (`plugins/sqlite-select-id-key-fix.php`, etc.): Keep
+  project-owned MU-plugin sources in `plugins/`, follow the WordPress coding
+  standards, and keep behavior conservative and safe to fall back on, avoiding
+  destructive changes for cases that cannot be fully reasoned about.
 - **YAML workflows**: Keep pull-request validation and the release-triggered `Release` workflow consistent with the supported platform matrix and release policy.
 - Comments should explain intent and constraints, not restate what the code already expresses.
 

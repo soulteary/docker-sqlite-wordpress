@@ -74,12 +74,7 @@ jobs:
               .dockerignore \
               Dockerfile \
               docker-entrypoint-sqlite.sh \
-              sqlite-database-integration-loader.php \
-              sqlite-diagnostics.php \
-              sqlite-local-core-update.php \
-              sqlite-select-id-key-fix.php \
-              sqlite-wordpress-performance.php \
-              sqlite-wordpress-smtp.php \
+              plugins \
               tool-reset-user-password.php \
               tool-update-site-url.php \
               tests/image-smoke.sh \
