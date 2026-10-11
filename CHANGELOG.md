@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+## [2026.10.12-r1] - 2026-10-12
+
+### Changed
+
+- Upgraded SQLite Database Integration from `3.0.2` to `3.1.0`, pinned to
+  upstream commit `6546e4538b708a1d8a565a1d31688bd63b610fa3`.
+- Refreshed the pinned WordPress 7.1.0/PHP 8.5 Apache base manifest digest
+  to match the current official image required by the upstream release gate.
+- Included randomized default database storage, the `DB_PATH` configuration
+  constant, SQL `IF()` and `TRADITIONAL` mode fixes, and improved table
+  collation defaults for MariaDB exports.
+- Updated SQLite Diagnostics to prefer the runtime `DB_PATH` while retaining
+  compatibility with the legacy `FQDB` constant.
+
+### Release status
+
+- Prepared for publication as `2026.10.12-r1`. `2026.09.10-r1` remains the
+  previous verified release until both registries and release evidence pass.
+
+### Upgrade notes
+
+- Back up the entire `wp-content/database/` directory before upgrading.
+  Default legacy databases migrate automatically to a randomized directory;
+  preserve `db-path.php` and the database's WAL/SHM sidecars on the same volume.
+- Read `DB_PATH` after WordPress loads for backup and migration integrations.
+  Explicit paths remain unchanged. Configure an absolute persistent path
+  outside the web root; changing `DB_PATH` does not move existing data.
+- `DB_DIR` and `DB_FILE` are deprecated, conflicting legacy constants warn,
+  and relative database paths are rejected.
+
 ## [2026.09.10-r1] - 2026-09-10
 
 ### Changed
@@ -14,9 +44,8 @@
 
 ### Release status
 
-- Prepared as the first immutable release for 2026-09-10. Until its protected
-  tag is published and the two registry indexes, evidence, and signatures are
-  verified, `2026.09.03-r1` remains the current complete release.
+- Published successfully to Docker Hub and GHCR with verified release evidence
+  and signatures; the `2026.09.10` and `latest` aliases were promoted.
 
 ### Upgrade notes
 
