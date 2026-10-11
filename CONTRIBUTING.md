@@ -103,7 +103,7 @@ php tests/test-sqlite-select-id-key-fix.php
 php tests/test-tool-update-site-url.php
 php tests/test-tool-reset-user-password.php
 go install github.com/soulteary/ci-recipes/cmd/ci-recipes@83ccd6f83d7e7ef40f5d6faf2e11960f1de74a78
-ci-recipes docker-sqlite-wordpress validate-release 2026.09.10-r1
+ci-recipes docker-sqlite-wordpress validate-release 2026.10.12-r1
 ```
 
 To reproduce the remaining lint and configuration checks:

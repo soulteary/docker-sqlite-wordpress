@@ -121,6 +121,13 @@ docker run --rm --platform "${platform}" \
 # shellcheck disable=SC2016
 docker run --rm --platform "${platform}" "${image}" php -r '
   require "/var/www/html/wp-load.php";
+  if (!defined("DB_PATH") || !is_file(DB_PATH)) {
+    throw new RuntimeException("Runtime DB_PATH is missing or invalid.");
+  }
+  $environment = sqlite_diagnostics_environment();
+  if ($environment["Database file"] !== DB_PATH) {
+    throw new RuntimeException("Diagnostics did not report runtime DB_PATH.");
+  }
   $driver = $GLOBALS["wpdb"]->get_driver();
   foreach (["beginTransaction", "commit", "rollBack", "inTransaction"] as $method) {
     if (!method_exists($driver, $method)) {
@@ -143,3 +150,8 @@ docker run --rm --platform "${platform}" \
 docker run --rm --platform "${platform}" \
 	--volume "${repo_root}/tests/image-smoke-user-password.php:/tmp/image-smoke-user-password.php:ro" \
 	"${image}" php /tmp/image-smoke-user-password.php
+
+# Verify both legacy default filenames survive migration and a storage restart.
+docker run --rm --platform "${platform}" \
+	--volume "${repo_root}/tests/image-smoke-storage.php:/tmp/image-smoke-storage.php:ro" \
+	--entrypoint php "${image}" /tmp/image-smoke-storage.php

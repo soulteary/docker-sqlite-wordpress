@@ -3,7 +3,7 @@
  * Plugin Name: SQLite Diagnostics
  * Plugin URI: https://github.com/soulteary/docker-sqlite-wordpress
  * Description: Read-only diagnostics page under the Tools menu that surfaces the native wp_mysql_parser lexer/parser state, SQLite version/source id, live-connection PRAGMA values, main/WAL/SHM storage sizes, PHP/architecture environment details, and the sqlite-database-integration plugin version. Performs no writes and never modifies the live site database.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: soulteary
  * Author URI: https://soulteary.com
  *
@@ -253,13 +253,13 @@ function sqlite_diagnostics_pragmas() {
  * @return array<string,string> Label => value pairs (raw, unescaped).
  */
 function sqlite_diagnostics_storage() {
-	if ( ! defined( 'FQDB' ) ) {
+	if ( ! defined( 'DB_PATH' ) && ! defined( 'FQDB' ) ) {
 		return array(
-			__( 'Main file', 'sqlite-diagnostics' ) => __( 'FQDB not defined', 'sqlite-diagnostics' ),
+			__( 'Main file', 'sqlite-diagnostics' ) => __( 'DB_PATH not defined', 'sqlite-diagnostics' ),
 		);
 	}
 
-	$fqdb  = (string) FQDB;
+	$fqdb  = defined( 'DB_PATH' ) ? (string) DB_PATH : (string) FQDB;
 	$files = array(
 		__( 'Main file', 'sqlite-diagnostics' ) => $fqdb,
 		__( 'WAL sidecar', 'sqlite-diagnostics' ) => $fqdb . '-wal',
@@ -303,8 +303,8 @@ function sqlite_diagnostics_environment() {
 		? (string) SQLITE_DB_DROPIN_VERSION
 		: __( 'not defined', 'sqlite-diagnostics' );
 
-	if ( defined( 'FQDB' ) ) {
-		$db_path = (string) FQDB;
+	if ( defined( 'DB_PATH' ) || defined( 'FQDB' ) ) {
+		$db_path = defined( 'DB_PATH' ) ? (string) DB_PATH : (string) FQDB;
 		$rows[ __( 'Database file', 'sqlite-diagnostics' ) ] = $db_path;
 
 		if ( file_exists( $db_path ) ) {
@@ -316,7 +316,7 @@ function sqlite_diagnostics_environment() {
 			$rows[ __( 'Database file size', 'sqlite-diagnostics' ) ] = __( 'file not found', 'sqlite-diagnostics' );
 		}
 	} else {
-		$rows[ __( 'Database file', 'sqlite-diagnostics' ) ] = __( 'FQDB not defined', 'sqlite-diagnostics' );
+		$rows[ __( 'Database file', 'sqlite-diagnostics' ) ] = __( 'DB_PATH not defined', 'sqlite-diagnostics' );
 	}
 
 	return $rows;

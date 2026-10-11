@@ -1,12 +1,12 @@
 # plugin: https://github.com/WordPress/sqlite-database-integration
 # The optional native Rust extension `wp_mysql_parser` accelerates the MySQL
 # lexer/parser used by the SQLite driver. It requires the 3.0 monorepo layout.
-ARG IMAGE_VERSION=2026.09.10-r1
+ARG IMAGE_VERSION=2026.10.12-r1
 ARG IMAGE_REVISION=unknown
 ARG WORDPRESS_VERSION=7.1.0
-ARG WORDPRESS_IMAGE=wordpress:7.1.0-php8.5-apache@sha256:397daa8a8816347e724362c2122129601eb0811fbaff0ce9b2b22c7b057a745d
-ARG SQLITE_DATABASE_INTEGRATION_VERSION=3.0.2
-ARG SQLITE_DATABASE_INTEGRATION_COMMIT=085ea60b16c648d40464654afa667f0812c040de
+ARG WORDPRESS_IMAGE=wordpress:7.1.0-php8.5-apache@sha256:a8ee182a3806f9bb9ec2a34851ecb0d8fc6fbf9e421198d2ca7aeaae4bdfc807
+ARG SQLITE_DATABASE_INTEGRATION_VERSION=3.1.0
+ARG SQLITE_DATABASE_INTEGRATION_COMMIT=6546e4538b708a1d8a565a1d31688bd63b610fa3
 ARG RUSTUP_VERSION=1.29.0
 ARG RUST_TOOLCHAIN_VERSION=1.98.0
 
@@ -114,7 +114,7 @@ LABEL org.opencontainers.image.authors="soulteary@gmail.com" \
       org.opencontainers.image.revision="${IMAGE_REVISION}" \
       org.opencontainers.image.licenses="Apache-2.0 AND GPL-2.0-or-later" \
       org.opencontainers.image.base.name="docker.io/library/wordpress:7.1.0-php8.5-apache" \
-      org.opencontainers.image.base.digest="sha256:397daa8a8816347e724362c2122129601eb0811fbaff0ce9b2b22c7b057a745d" \
+      org.opencontainers.image.base.digest="sha256:a8ee182a3806f9bb9ec2a34851ecb0d8fc6fbf9e421198d2ca7aeaae4bdfc807" \
       io.soulteary.wordpress.version="${WORDPRESS_VERSION}" \
       io.soulteary.sqlite-integration.version="${SQLITE_DATABASE_INTEGRATION_VERSION}"
 
