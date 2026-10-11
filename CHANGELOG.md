@@ -18,8 +18,9 @@
 
 ### Release status
 
-- Prepared for publication as `2026.10.12-r1`. `2026.09.10-r1` remains the
-  previous verified release until both registries and release evidence pass.
+- Published to Docker Hub and GHCR as matching five-platform indexes at
+  `sha256:e060cc1abb7940bb2e50c4e54ded85b6dbd7fd66d7361f249180d36125e9e373`.
+  Per-platform SBOM, provenance, and both registry signatures passed verification.
 
 ### Upgrade notes
 
