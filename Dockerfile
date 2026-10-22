@@ -5,7 +5,7 @@ ARG IMAGE_VERSION=2026.10.22-r1
 ARG IMAGE_REVISION=unknown
 ARG WORDPRESS_VERSION=7.1.3
 # Verified multi-architecture digest; PHP 8.5.12 checked in CI before pinning.
-ARG WORDPRESS_IMAGE=wordpress:7.1.3-php8.5-apache@sha256:574ea6f58239fba5fc95fe22e03683777259534498ab8e0ea3f6f176a9d620d1
+ARG WORDPRESS_IMAGE=wordpress:7.1.3-php8.5-apache@sha256:ce31904fa1e51b73543fa2e35cc8f1747589b2abf48dc747b422749b88b77e9e
 ARG SQLITE_DATABASE_INTEGRATION_VERSION=3.1.0
 ARG SQLITE_DATABASE_INTEGRATION_COMMIT=6546e4538b708a1d8a565a1d31688bd63b610fa3
 ARG RUSTUP_VERSION=1.29.0
@@ -121,7 +121,7 @@ LABEL org.opencontainers.image.authors="soulteary@gmail.com" \
       org.opencontainers.image.revision="${IMAGE_REVISION}" \
       org.opencontainers.image.licenses="Apache-2.0 AND GPL-2.0-or-later" \
       org.opencontainers.image.base.name="docker.io/library/wordpress:7.1.3-php8.5-apache" \
-      org.opencontainers.image.base.digest="sha256:574ea6f58239fba5fc95fe22e03683777259534498ab8e0ea3f6f176a9d620d1" \
+      org.opencontainers.image.base.digest="sha256:ce31904fa1e51b73543fa2e35cc8f1747589b2abf48dc747b422749b88b77e9e" \
       io.soulteary.wordpress.version="${WORDPRESS_VERSION}" \
       io.soulteary.sqlite-integration.version="${SQLITE_DATABASE_INTEGRATION_VERSION}"
 

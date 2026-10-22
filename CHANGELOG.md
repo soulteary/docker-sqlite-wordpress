@@ -8,7 +8,7 @@
 
 - Require PHP 8.5.12 or newer in both build and runtime stages.
 - Pin WordPress 7.1.3 / PHP 8.5 Apache to multi-platform digest
-  `sha256:574ea6f58239fba5fc95fe22e03683777259534498ab8e0ea3f6f176a9d620d1`.
+  `sha256:ce31904fa1e51b73543fa2e35cc8f1747589b2abf48dc747b422749b88b77e9e`.
 - Disable session upload progress and enable strict session mode.
 - Check the PHP version and session controls in every platform smoke test.
 
