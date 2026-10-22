@@ -3,11 +3,9 @@
 # lexer/parser used by the SQLite driver. It requires the 3.0 monorepo layout.
 ARG IMAGE_VERSION=2026.10.12-r1
 ARG IMAGE_REVISION=unknown
-ARG WORDPRESS_VERSION=7.1.0
-# The upstream pinned image currently predates the PHP 8.5.12 patch.
-# Preserve tag/digest consistency; build is intentionally blocked by the runtime guard
-# until a verified patched upstream multi-arch manifest can replace both occurrences.
-ARG WORDPRESS_IMAGE=wordpress:7.1.0-php8.5-apache@sha256:a8ee182a3806f9bb9ec2a34851ecb0d8fc6fbf9e421198d2ca7aeaae4bdfc807
+ARG WORDPRESS_VERSION=7.1.3
+# Verified multi-architecture digest; PHP 8.5.12 checked in CI before pinning.
+ARG WORDPRESS_IMAGE=wordpress:7.1.3-php8.5-apache@sha256:574ea6f58239fba5fc95fe22e03683777259534498ab8e0ea3f6f176a9d620d1
 ARG SQLITE_DATABASE_INTEGRATION_VERSION=3.1.0
 ARG SQLITE_DATABASE_INTEGRATION_COMMIT=6546e4538b708a1d8a565a1d31688bd63b610fa3
 ARG RUSTUP_VERSION=1.29.0
@@ -122,8 +120,8 @@ LABEL org.opencontainers.image.authors="soulteary@gmail.com" \
       org.opencontainers.image.version="${IMAGE_VERSION}" \
       org.opencontainers.image.revision="${IMAGE_REVISION}" \
       org.opencontainers.image.licenses="Apache-2.0 AND GPL-2.0-or-later" \
-      org.opencontainers.image.base.name="docker.io/library/wordpress:7.1.0-php8.5-apache" \
-      org.opencontainers.image.base.digest="sha256:a8ee182a3806f9bb9ec2a34851ecb0d8fc6fbf9e421198d2ca7aeaae4bdfc807" \
+      org.opencontainers.image.base.name="docker.io/library/wordpress:7.1.3-php8.5-apache" \
+      org.opencontainers.image.base.digest="sha256:574ea6f58239fba5fc95fe22e03683777259534498ab8e0ea3f6f176a9d620d1" \
       io.soulteary.wordpress.version="${WORDPRESS_VERSION}" \
       io.soulteary.sqlite-integration.version="${SQLITE_DATABASE_INTEGRATION_VERSION}"
 
