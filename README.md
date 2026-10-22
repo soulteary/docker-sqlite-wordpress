@@ -17,7 +17,7 @@ WordPress with SQLite, ready to use out of the box.
 
 ## Native MySQL Parser Extension
 
-The image bundles WordPress `7.1.0` on PHP 8.5/Apache and [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration) `v3.1.0` together with its optional native Rust extension `wp_mysql_parser`. The extension is compiled and enabled on `amd64` and `arm64`; published 32-bit ARM variants use the plugin's pure-PHP fallback. The SQLite driver detects the available implementation automatically (the upstream project reports roughly 4.8x faster lexing and 15.5x faster parsing for the native path).
+The image bundles WordPress `7.1.3` on PHP 8.5/Apache and [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration) `v3.1.0` together with its optional native Rust extension `wp_mysql_parser`. The extension is compiled and enabled on `amd64` and `arm64`; published 32-bit ARM variants use the plugin's pure-PHP fallback. The SQLite driver detects the available implementation automatically (the upstream project reports roughly 4.8x faster lexing and 15.5x faster parsing for the native path).
 
 Verify it is loaded inside the container:
 
@@ -528,7 +528,7 @@ refuses Multisite installations.
 ## Volume and Upgrade Notes
 
 Back up `wp-content/database/` before upgrading an existing site to the
-WordPress 7.1.0 / SQLite Database Integration 3.1.0 image. The v3 integration
+WordPress 7.1.3 / SQLite Database Integration 3.1.0 image. The v3 integration
 requires a non-empty `DB_NAME` in custom `wp-config.php` files and uses WAL
 journaling by default, so the database's `-wal` and `-shm` sidecar files must
 remain on the same persistent volume as the main SQLite file.
@@ -562,9 +562,9 @@ local archive. The standard `Core_Upgrader` still performs the update and its
 normal checks; `wp-content` is never included in the archive.
 
 WordPress 7.1 reports its stable update offer as `7.1`, while this image records
-the bundled package as `7.1.0`. Stable versions that differ only by trailing
+the bundled package as `7.1.3`. Stable versions that differ only by trailing
 zero components are treated as equivalent, so that offer resolves to
-`/usr/src/wordpress-upgrades/wordpress-7.1.0-no-content.zip`. Pre-release and
+`/usr/src/wordpress-upgrades/wordpress-7.1.3-no-content.zip`. Pre-release and
 non-numeric version offers are never redirected to a local package.
 
 After changing the image, back up the full site and database, recreate the

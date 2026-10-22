@@ -3,8 +3,9 @@
 # lexer/parser used by the SQLite driver. It requires the 3.0 monorepo layout.
 ARG IMAGE_VERSION=2026.10.12-r1
 ARG IMAGE_REVISION=unknown
-ARG WORDPRESS_VERSION=7.1.0
-ARG WORDPRESS_IMAGE=wordpress:7.1.0-php8.5-apache@sha256:a8ee182a3806f9bb9ec2a34851ecb0d8fc6fbf9e421198d2ca7aeaae4bdfc807
+ARG WORDPRESS_VERSION=7.1.3
+# Verified multi-architecture digest; PHP 8.5.12 checked in CI before pinning.
+ARG WORDPRESS_IMAGE=wordpress:7.1.3-php8.5-apache@sha256:574ea6f58239fba5fc95fe22e03683777259534498ab8e0ea3f6f176a9d620d1
 ARG SQLITE_DATABASE_INTEGRATION_VERSION=3.1.0
 ARG SQLITE_DATABASE_INTEGRATION_COMMIT=6546e4538b708a1d8a565a1d31688bd63b610fa3
 ARG RUSTUP_VERSION=1.29.0
@@ -12,6 +13,8 @@ ARG RUST_TOOLCHAIN_VERSION=1.98.0
 
 # ---------- Stage 1: build the native Rust extension + resolve plugin symlink ----------
 FROM ${WORDPRESS_IMAGE} AS ext-builder
+# Fail closed on vulnerable upstream PHP images.
+RUN php -r 'if (PHP_MAJOR_VERSION !== 8 || PHP_MINOR_VERSION !== 5 || version_compare(PHP_VERSION, "8.5.12", "<")) { fwrite(STDERR, "PHP 8.5.12+ required for CVE-2026-109618/109619\n"); exit(1); }'
 ARG WORDPRESS_VERSION
 ARG SQLITE_DATABASE_INTEGRATION_VERSION
 ARG SQLITE_DATABASE_INTEGRATION_COMMIT
@@ -102,6 +105,10 @@ RUN git init /src && \
 
 # ---------- Stage 2: final WordPress + SQLite runtime image ----------
 FROM ${WORDPRESS_IMAGE}
+# Verify the actual final runtime version.
+RUN php -r 'if (PHP_MAJOR_VERSION !== 8 || PHP_MINOR_VERSION !== 5 || version_compare(PHP_VERSION, "8.5.12", "<")) { fwrite(STDERR, "PHP 8.5.12+ required for CVE-2026-109618/109619\n"); exit(1); }'
+# Defense in depth; not a substitute for the PHP patch.
+RUN printf '%s\n' 'session.upload_progress.enabled=Off' 'session.use_strict_mode=1' > /usr/local/etc/php/conf.d/zz-session-security.ini
 ARG IMAGE_VERSION
 ARG IMAGE_REVISION
 ARG WORDPRESS_VERSION
@@ -113,8 +120,8 @@ LABEL org.opencontainers.image.authors="soulteary@gmail.com" \
       org.opencontainers.image.version="${IMAGE_VERSION}" \
       org.opencontainers.image.revision="${IMAGE_REVISION}" \
       org.opencontainers.image.licenses="Apache-2.0 AND GPL-2.0-or-later" \
-      org.opencontainers.image.base.name="docker.io/library/wordpress:7.1.0-php8.5-apache" \
-      org.opencontainers.image.base.digest="sha256:a8ee182a3806f9bb9ec2a34851ecb0d8fc6fbf9e421198d2ca7aeaae4bdfc807" \
+      org.opencontainers.image.base.name="docker.io/library/wordpress:7.1.3-php8.5-apache" \
+      org.opencontainers.image.base.digest="sha256:574ea6f58239fba5fc95fe22e03683777259534498ab8e0ea3f6f176a9d620d1" \
       io.soulteary.wordpress.version="${WORDPRESS_VERSION}" \
       io.soulteary.sqlite-integration.version="${SQLITE_DATABASE_INTEGRATION_VERSION}"
 

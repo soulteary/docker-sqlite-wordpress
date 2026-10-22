@@ -140,6 +140,23 @@ jobs:
           "${{ steps.release.outputs.release_version }}"
           --verify-upstream
 
+  probe-patched-upstream:
+    name: Identify patched upstream digest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect upstream WordPress image and PHP patch level
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="wordpress:7.1.3-php8.5-apache"
+          docker buildx imagetools inspect "${image}"
+          digest="$(docker buildx imagetools inspect "${image}" --format '{{json .Manifest}}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["digest"])')"
+          echo "Candidate pinned image: ${image}@${digest}"
+          docker run --rm --platform linux/amd64 "${image}@${digest}" php -r '
+            printf("PHP_VERSION=%s\\n", PHP_VERSION);
+            if (PHP_MAJOR_VERSION !== 8 || PHP_MINOR_VERSION !== 5 || version_compare(PHP_VERSION, "8.5.12", "<")) exit(1);
+          '
+
   image-smoke:
     needs: validate
     if: needs.validate.outputs.image_changed == 'true'
