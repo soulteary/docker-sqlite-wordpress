@@ -5,7 +5,7 @@ ARG IMAGE_VERSION=2026.10.12-r1
 ARG IMAGE_REVISION=unknown
 ARG WORDPRESS_VERSION=7.1.0
 # Resolve and pin a verified multi-arch digest before merging this PR.
-ARG WORDPRESS_IMAGE=wordpress:7.1.0-php8.5-apache
+ARG WORDPRESS_IMAGE=wordpress:7.1.0-php8.5-apache@sha256:26cc4158e9665d943362bd224a0610a1e487514a1e13aa96512366b425c0cab0
 ARG SQLITE_DATABASE_INTEGRATION_VERSION=3.1.0
 ARG SQLITE_DATABASE_INTEGRATION_COMMIT=6546e4538b708a1d8a565a1d31688bd63b610fa3
 ARG RUSTUP_VERSION=1.29.0
@@ -121,6 +121,7 @@ LABEL org.opencontainers.image.authors="soulteary@gmail.com" \
       org.opencontainers.image.revision="${IMAGE_REVISION}" \
       org.opencontainers.image.licenses="Apache-2.0 AND GPL-2.0-or-later" \
       org.opencontainers.image.base.name="docker.io/library/wordpress:7.1.0-php8.5-apache" \
+      org.opencontainers.image.base.digest="sha256:26cc4158e9665d943362bd224a0610a1e487514a1e13aa96512366b425c0cab0" \
       io.soulteary.wordpress.version="${WORDPRESS_VERSION}" \
       io.soulteary.sqlite-integration.version="${SQLITE_DATABASE_INTEGRATION_VERSION}"
 
