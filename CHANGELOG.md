@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [2026.10.22-r1] - 2026-10-22
+
+### Security
+
+- Require PHP 8.5.12 or newer in both build and runtime stages.
+- Pin WordPress 7.1.3 / PHP 8.5 Apache to multi-platform digest
+  `sha256:ce31904fa1e51b73543fa2e35cc8f1747589b2abf48dc747b422749b88b77e9e`.
+- Disable session upload progress and enable strict session mode.
+- Check the PHP version and session controls in every platform smoke test.
+
+### Upgrade notes
+
+- Back up the complete site and database, including WAL/SHM sidecars, then
+  recreate the container using the new exact image tag. Updating WordPress
+  files alone does not update the PHP runtime.
+- Publication is pending verification of both registry indexes, all five
+  platforms, per-platform SPDX SBOM/SLSA provenance and keyless signatures.
+
 ## [2026.10.12-r1] - 2026-10-12
 
 ### Changed

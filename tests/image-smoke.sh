@@ -21,6 +21,20 @@ if [[ "${actual_debian_arch}" != "${expected_debian_arch}" ]]; then
 	exit 1
 fi
 
+# Verify the packaged runtime rather than relying only on the build guard.
+docker run --rm --platform "${platform}" --entrypoint php "${image}" -r '
+  if (PHP_MAJOR_VERSION !== 8 || PHP_MINOR_VERSION !== 5 || version_compare(PHP_VERSION, "8.5.12", "<")) {
+    throw new RuntimeException("PHP 8.5.12+ required");
+  }
+  if (ini_get("session.upload_progress.enabled") !== "0" && ini_get("session.upload_progress.enabled") !== "") {
+    throw new RuntimeException("Session upload progress must be disabled");
+  }
+  if (ini_get("session.use_strict_mode") !== "1") {
+    throw new RuntimeException("Strict session mode must be enabled");
+  }
+  printf("Verified PHP %s and session security controls\n", PHP_VERSION);
+'
+
 modules="$(docker run --rm --platform "${platform}" --entrypoint php "${image}" -m)"
 if [[ "${parser_mode}" == "native" ]]; then
 	grep -Fxq wp_mysql_parser <<< "${modules}"
