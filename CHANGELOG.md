@@ -17,8 +17,13 @@
 - Back up the complete site and database, including WAL/SHM sidecars, then
   recreate the container using the new exact image tag. Updating WordPress
   files alone does not update the PHP runtime.
-- Publication is pending verification of both registry indexes, all five
-  platforms, per-platform SPDX SBOM/SLSA provenance and keyless signatures.
+### Release status
+
+- Published to Docker Hub and GHCR for amd64, arm64, arm/v7, arm/v6 and arm/v5
+  with matching manifest digest `sha256:f76f3017be7f860278b9006b5deb7d60e7a14975a257e418a1690fd0ecab5cd1`.
+- Per-platform SPDX SBOM, max-mode SLSA provenance and both registry keyless
+  signatures passed verification. The `2026.10.22` and `latest` aliases were
+  promoted without rebuilding.
 
 ## [2026.10.12-r1] - 2026-10-12
 
