@@ -4,10 +4,11 @@
 
 WordPress with SQLite, ready to use out of the box.
 
-<!-- release-availability: pending -->
-> **Security release in preparation:** `2026.10.22-r1` requires PHP 8.5.12+.
-> Registry publication, per-platform SBOM/provenance and signature verification
-> must complete before this version is marked available.
+> **Published security release:** [`2026.10.22-r1`](https://github.com/soulteary/docker-sqlite-wordpress/releases/tag/2026.10.22-r1)
+> is available from Docker Hub and GHCR as matching five-platform indexes at
+> `sha256:f76f3017be7f860278b9006b5deb7d60e7a14975a257e418a1690fd0ecab5cd1`.
+> PHP 8.5.12+ gates, per-platform SBOM/provenance and both registry signatures
+> passed verification.
 
 - Based on [official image](https://hub.docker.com/_/wordpress), Easier and more sustainable solution.
 - DockerHub Page: https://hub.docker.com/r/soulteary/sqlite-wordpress
