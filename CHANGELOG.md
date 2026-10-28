@@ -20,8 +20,10 @@
 
 ### Release status
 
-- Candidate only; registry publication and signature verification are pending.
-  Compose builds this checkout locally until the published release is verified.
+- Published to Docker Hub and GHCR as matching five-platform indexes at
+  `sha256:422486f00ff1a53bbb8245a18341d91337d608b69521c893e7c5d5fba9b31500`.
+  Per-platform SPDX SBOM, max-mode SLSA provenance, and both registry signatures
+  passed verification.
 
 ### Upgrade notes
 

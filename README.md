@@ -4,11 +4,11 @@
 
 WordPress with SQLite, ready to use out of the box.
 
-<!-- release-availability: pending -->
-> **Release candidate:** `2026.10.29-r1` updates SQLite Database Integration to
-> `3.1.2`. Registry publication is pending. Build this checkout with
-> `docker compose up -d --build` to try it now. The exact image commands below
-> apply after publication; the last published release is `2026.10.22-r1`.
+> **Published release:** [`2026.10.29-r1`](https://github.com/soulteary/docker-sqlite-wordpress/releases/tag/2026.10.29-r1)
+> bundles SQLite Database Integration `3.1.2` and is available from Docker Hub
+> and GHCR as matching five-platform indexes at
+> `sha256:422486f00ff1a53bbb8245a18341d91337d608b69521c893e7c5d5fba9b31500`.
+> Per-platform SBOM/provenance and both registry signatures passed verification.
 
 - Based on [official image](https://hub.docker.com/_/wordpress), Easier and more sustainable solution.
 - DockerHub Page: https://hub.docker.com/r/soulteary/sqlite-wordpress
@@ -68,7 +68,7 @@ docker pull ghcr.io/soulteary/sqlite-wordpress:latest
 docker pull ghcr.io/soulteary/sqlite-wordpress:2026.10.29-r1
 ```
 
-After publication, launch the image on port `8080`:
+Launch the published image on port `8080`:
 
 ```bash
 docker run --rm -it -p 127.0.0.1:8080:80 \
@@ -76,8 +76,7 @@ docker run --rm -it -p 127.0.0.1:8080:80 \
   soulteary/sqlite-wordpress:2026.10.29-r1
 ```
 
-For the current candidate, use the repository Compose file with
-`docker compose up -d --build`. After publication, the equivalent configuration is:
+You can also use Docker Compose to start WordPress:
 
 ```yaml
 services:
