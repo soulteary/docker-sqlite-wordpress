@@ -12,6 +12,8 @@
   removal; use the PHP parser on every supported platform and verify this in CI.
   Retain only the unused Rust version argument required by the pinned release
   validator until that shared validator supports extension-free builds.
+- Refresh the official WordPress 7.1.3/PHP 8.5 base manifest digest after
+  verifying the upstream PHP security gate.
 - Include configurable `SQLITE_BUSY_TIMEOUT`, transaction preservation after
   failed statements, table rebuild and AUTO_INCREMENT fixes, and improved SQL
   defaults, ALTER COLUMN, hexadecimal literal, and timestamp handling.
