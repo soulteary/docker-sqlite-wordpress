@@ -1,33 +1,27 @@
 # plugin: https://github.com/WordPress/sqlite-database-integration
-# The optional native Rust extension `wp_mysql_parser` accelerates the MySQL
-# lexer/parser used by the SQLite driver. It requires the 3.0 monorepo layout.
-ARG IMAGE_VERSION=2026.10.22-r1
+# SQLite Database Integration 3.1.2 uses its PHP parser on every platform.
+ARG IMAGE_VERSION=2026.10.29-r1
 ARG IMAGE_REVISION=unknown
 ARG WORDPRESS_VERSION=7.1.3
 # Verified multi-architecture digest; PHP 8.5.12 checked in CI before pinning.
-ARG WORDPRESS_IMAGE=wordpress:7.1.3-php8.5-apache@sha256:ce31904fa1e51b73543fa2e35cc8f1747589b2abf48dc747b422749b88b77e9e
-ARG SQLITE_DATABASE_INTEGRATION_VERSION=3.1.0
-ARG SQLITE_DATABASE_INTEGRATION_COMMIT=6546e4538b708a1d8a565a1d31688bd63b610fa3
-ARG RUSTUP_VERSION=1.29.0
+ARG WORDPRESS_IMAGE=wordpress:7.1.3-php8.5-apache@sha256:89e44e84974773a97b5ca5fa21b95377d372956fc9d7d1ad363e9fe062d5fe56
+ARG SQLITE_DATABASE_INTEGRATION_VERSION=3.1.2
+ARG SQLITE_DATABASE_INTEGRATION_COMMIT=dd0bcd6f1a52b79c934b33ec6a3dc4b20811225a
+# Compatibility metadata for the pinned ci-recipes validator, which requires
+# this field. No Rust toolchain is installed or used by this image.
 ARG RUST_TOOLCHAIN_VERSION=1.98.0
 
-# ---------- Stage 1: build the native Rust extension + resolve plugin symlink ----------
+# ---------- Stage 1: assemble plugin + resolve database symlink ----------
 FROM ${WORDPRESS_IMAGE} AS ext-builder
 # Fail closed on vulnerable upstream PHP images.
 RUN php -r 'if (PHP_MAJOR_VERSION !== 8 || PHP_MINOR_VERSION !== 5 || version_compare(PHP_VERSION, "8.5.12", "<")) { fwrite(STDERR, "PHP 8.5.12+ required for CVE-2026-109618/109619\n"); exit(1); }'
 ARG WORDPRESS_VERSION
 ARG SQLITE_DATABASE_INTEGRATION_VERSION
 ARG SQLITE_DATABASE_INTEGRATION_COMMIT
-ARG RUSTUP_VERSION
-ARG RUST_TOOLCHAIN_VERSION
-# Provided automatically by BuildKit (e.g. amd64, arm64, arm). Used to gate the
-# Rust build to platforms where rustup ships a reliable toolchain under QEMU.
-ARG TARGETARCH
-
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      curl ca-certificates build-essential pkg-config clang libclang-dev git zip unzip \
+      ca-certificates git zip unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Build a deterministic no-content WordPress core archive from the exact pinned
@@ -52,35 +46,7 @@ RUN package_root="$(mktemp -d)" && \
     rm -f /wordpress-core-no-content.files && \
     rm -rf "${package_root}"
 
-# The native `wp_mysql_parser` extension is an optional accelerator; the plugin
-# transparently falls back to its pure-PHP parser when the .so is absent. On
-# 32-bit ARM (arm/v5, arm/v6, arm/v7) the rustup installer fails under QEMU
-# emulation (missing/mismatched ld-linux-armhf.so.3), so we only build the
-# extension on amd64 and arm64 and skip it elsewhere.
-RUN case "${TARGETARCH}" in \
-      amd64) \
-        rustup_target=x86_64-unknown-linux-gnu; \
-        rustup_sha256=4acc9acc76d5079515b46346a485974457b5a79893cfb01112423c89aeb5aa10 ;; \
-      arm64) \
-        rustup_target=aarch64-unknown-linux-gnu; \
-        rustup_sha256=9732d6c5e2a098d3521fca8145d826ae0aaa067ef2385ead08e6feac88fa5792 ;; \
-      *) \
-        echo "Skipping Rust toolchain install on unsupported arch: ${TARGETARCH}"; \
-        exit 0 ;; \
-    esac && \
-    curl --proto '=https' --tlsv1.2 --retry 3 -fsSLo /tmp/rustup-init \
-      "https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/${rustup_target}/rustup-init" && \
-    echo "${rustup_sha256}  /tmp/rustup-init" | sha256sum -c - && \
-    chmod +x /tmp/rustup-init && \
-    /tmp/rustup-init -y --no-modify-path --profile minimal \
-      --default-toolchain "${RUST_TOOLCHAIN_VERSION}" && \
-    /root/.cargo/bin/rustc --version | grep -F "rustc ${RUST_TOOLCHAIN_VERSION} " && \
-    rm -f /tmp/rustup-init
-ENV PATH="/root/.cargo/bin:${PATH}"
-
-# The 3.0 GitHub tarball excludes the `packages` contents, so we must clone.
-# When Rust is unavailable (32-bit ARM), we skip compiling the extension and
-# emit an empty marker file so the final stage's COPY still succeeds.
+# Fetch the pinned monorepo and materialize the plugin database symlink.
 RUN git init /src && \
     git -C /src remote add origin https://github.com/WordPress/sqlite-database-integration.git && \
     git -C /src fetch --depth 1 origin "${SQLITE_DATABASE_INTEGRATION_COMMIT}" && \
@@ -91,17 +57,7 @@ RUN git init /src && \
     cp -R /src/packages/plugin-sqlite-database-integration /plugin && \
     rm /plugin/wp-includes/database && \
     cp -R /src/packages/mysql-on-sqlite/src /plugin/wp-includes/database && \
-    rm -rf /plugin/composer.json /plugin/vendor /plugin/node_modules && \
-    if command -v cargo >/dev/null 2>&1; then \
-      cd /src/packages/php-ext-wp-mysql-parser && \
-      PHP_CONFIG="$(command -v php-config)" \
-      LIBCLANG_PATH="$(dirname "$(find / -name 'libclang.so*' 2>/dev/null | head -n1)")" \
-      cargo build --release --locked && \
-      cp target/release/libwp_mysql_parser.so /libwp_mysql_parser.so ; \
-    else \
-      echo "cargo not found; skipping native extension build" && \
-      : > /libwp_mysql_parser.so ; \
-    fi
+    rm -rf /plugin/composer.json /plugin/vendor /plugin/node_modules
 
 # ---------- Stage 2: final WordPress + SQLite runtime image ----------
 FROM ${WORDPRESS_IMAGE}
@@ -121,7 +77,7 @@ LABEL org.opencontainers.image.authors="soulteary@gmail.com" \
       org.opencontainers.image.revision="${IMAGE_REVISION}" \
       org.opencontainers.image.licenses="Apache-2.0 AND GPL-2.0-or-later" \
       org.opencontainers.image.base.name="docker.io/library/wordpress:7.1.3-php8.5-apache" \
-      org.opencontainers.image.base.digest="sha256:ce31904fa1e51b73543fa2e35cc8f1747589b2abf48dc747b422749b88b77e9e" \
+      org.opencontainers.image.base.digest="sha256:89e44e84974773a97b5ca5fa21b95377d372956fc9d7d1ad363e9fe062d5fe56" \
       io.soulteary.wordpress.version="${WORDPRESS_VERSION}" \
       io.soulteary.sqlite-integration.version="${SQLITE_DATABASE_INTEGRATION_VERSION}"
 
@@ -230,17 +186,6 @@ RUN test -f "${WORDPRESS_PREPARE_DIR}/wp-content/mu-plugins/sqlite-database-inte
     test -f "${WORDPRESS_PREPARE_DIR}/tool-reset-user-password.php" && \
     grep -q 'SQLITE_DB_DROPIN_VERSION' "${WORDPRESS_PREPARE_DIR}/wp-content/db.php" && \
     ! grep -q '{SQLITE_IMPLEMENTATION_FOLDER_PATH}' "${WORDPRESS_PREPARE_DIR}/wp-content/db.php"
-
-# Enable the native MySQL parser extension when it was actually built.
-# On platforms where the build was skipped, the copied file is empty (a
-# placeholder), so we only register the extension when it contains a real .so.
-COPY --from=ext-builder /libwp_mysql_parser.so /usr/local/lib/php/extensions/wp_mysql_parser.so
-RUN if [ -s /usr/local/lib/php/extensions/wp_mysql_parser.so ]; then \
-      echo "extension=/usr/local/lib/php/extensions/wp_mysql_parser.so" > /usr/local/etc/php/conf.d/wp_mysql_parser.ini ; \
-    else \
-      echo "Native wp_mysql_parser extension not built for this platform; using PHP fallback." && \
-      rm -f /usr/local/lib/php/extensions/wp_mysql_parser.so ; \
-    fi
 
 # Wrap the stock entrypoint so the SQLite drop-in is (re)installed on any volume
 # state; CMD stays the base image's apache2-foreground.
