@@ -165,16 +165,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: amd64-native
+          - name: amd64-php
             runner: ubuntu-24.04
             platform: linux/amd64
-            parser_mode: native
+            parser_mode: fallback
             debian_arch: amd64
             qemu: false
-          - name: arm64-native
+          - name: arm64-php
             runner: ubuntu-24.04-arm
             platform: linux/arm64
-            parser_mode: native
+            parser_mode: fallback
             debian_arch: arm64
             qemu: false
           - name: armv7-fallback

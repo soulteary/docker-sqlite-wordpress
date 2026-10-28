@@ -15,7 +15,7 @@ tests, and documentation authored in this repository are licensed under the
 | Component | License | Source |
 | --- | --- | --- |
 | WordPress core | `GPL-2.0-or-later` | [wordpress/wordpress-develop](https://github.com/WordPress/wordpress-develop) |
-| SQLite Database Integration, including `wp_mysql_parser` | `GPL-2.0-or-later` | [WordPress/sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) |
+| SQLite Database Integration | `GPL-2.0-or-later` | [WordPress/sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) |
 | Project-owned packaging and runtime helpers | `Apache-2.0` | This repository |
 
 The image also inherits PHP, Apache HTTP Server, Debian packages, libraries,

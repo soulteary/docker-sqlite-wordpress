@@ -1,6 +1,6 @@
 # Contributing Guide
 
-Thank you for your interest in contributing to **Docker SQLite WordPress**! This project builds on the official [WordPress image](https://hub.docker.com/_/wordpress), integrating [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration) together with its optional native Rust accelerator extension `wp_mysql_parser`. The goal is to provide a ready-to-use WordPress container image that requires no MySQL.
+Thank you for your interest in contributing to **Docker SQLite WordPress**! This project builds on the official [WordPress image](https://hub.docker.com/_/wordpress), integrating [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration). The goal is to provide a ready-to-use WordPress container image that requires no MySQL.
 
 Before contributing, please read this guide along with the [Code of Conduct](./CODE_OF_CONDUCT.md).
 
@@ -58,8 +58,7 @@ Once started, visit `http://localhost:8080` to reach the WordPress setup wizard.
 
 Build and load the platform that matches your Docker host. Set
 `TARGET_PLATFORM` to `linux/amd64` or `linux/arm64` as appropriate. Selecting a
-different architecture requires emulation and does not test the native
-extension on your host architecture.
+different architecture requires emulation and tests the PHP parser under emulation.
 
 ```bash
 TARGET_PLATFORM=linux/amd64
@@ -75,7 +74,7 @@ docker run --rm -it -p 127.0.0.1:8080:80 \
 
 ### Multi-Arch Build
 
-This project supports `linux/amd64`, `linux/arm64`, `linux/arm/v7`, `linux/arm/v6`, and `linux/arm/v5`. The native Rust extension is compiled only on `amd64` and `arm64`; the other 32-bit ARM platforms automatically skip it and fall back to the pure-PHP parser (see the comments in the `Dockerfile`).
+This project supports `linux/amd64`, `linux/arm64`, `linux/arm/v7`, `linux/arm/v6`, and `linux/arm/v5`. SQLite Database Integration 3.1.2 uses the PHP parser on every platform; upstream removed the native Rust extension.
 
 Buildx cannot load a multi-platform result into the classic local Docker image
 store. Export an OCI archive explicitly when checking the complete platform
@@ -103,7 +102,7 @@ php tests/test-sqlite-select-id-key-fix.php
 php tests/test-tool-update-site-url.php
 php tests/test-tool-reset-user-password.php
 go install github.com/soulteary/ci-recipes/cmd/ci-recipes@83ccd6f83d7e7ef40f5d6faf2e11960f1de74a78
-ci-recipes docker-sqlite-wordpress validate-release 2026.10.22-r1
+ci-recipes docker-sqlite-wordpress validate-release 2026.10.29-r1
 ```
 
 To reproduce the remaining lint and configuration checks:
@@ -156,10 +155,10 @@ docker run --rm \
 After modifying the `Dockerfile`, integration, or recovery tool, please confirm
 the following inside the container:
 
-- Whether the native extension loads correctly per platform (`amd64` / `arm64` should load it; 32-bit ARM should fall back):
+- Confirm the removed native extension is absent on every platform:
 
 ```bash
-docker exec -it <container> php -m | grep wp_mysql_parser
+docker exec -it <container> php -r 'exit(extension_loaded("wp_mysql_parser") ? 1 : 0);'
 ```
 
 - Whether the companion must-use plugin is in place:
@@ -185,7 +184,7 @@ Please search for existing issues before opening a new one. When reporting a bug
 - The image tag used and the platform it runs on (architecture, OS)
 - Steps to reproduce, plus expected vs. actual behavior
 - Relevant logs (e.g. `docker logs <container>`)
-- If it relates to the native extension, include the output of `php -m | grep wp_mysql_parser`
+- For parser issues, include the SQLite Diagnostics output and PHP version.
 
 ## Submitting a Pull Request
 
@@ -198,7 +197,7 @@ Please search for existing issues before opening a new one. When reporting a bug
 
 ## Code Style Conventions
 
-- **Dockerfile**: Keep the multi-stage build structure clear; keep necessary comments for non-obvious trade-offs (such as skipping the Rust build per platform).
+- **Dockerfile**: Keep the multi-stage build structure clear; keep necessary comments for non-obvious trade-offs (such as materializing the upstream database symlink).
 - **PHP plugins** (`plugins/sqlite-select-id-key-fix.php`, etc.): Keep
   project-owned MU-plugin sources in `plugins/`, follow the WordPress coding
   standards, and keep behavior conservative and safe to fall back on, avoiding
