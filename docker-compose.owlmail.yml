@@ -26,7 +26,7 @@ services:
     image: ghcr.io/soulteary/owlmail:0.13.0
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "owlmail", "healthcheck"]
+      test: ["CMD", "/app/owlmail", "healthcheck", "--container"]
       interval: 10s
       timeout: 3s
       start_period: 5s
