@@ -171,8 +171,13 @@ WordPress database and is never rendered back into the form.
 ### Start with OwlMail
 
 The optional [`docker-compose.owlmail.yml`](./docker-compose.owlmail.yml)
-overlay starts OwlMail on the same private Compose network, persists its
-messages, and publishes only its Web inbox to the host:
+overlay pins OwlMail 0.13.0 on the same private Compose network, persists its
+complete `/app/mail`, and publishes only its Web inbox to the host. The SMTP
+listener remains private. The overlay declares `owlmail healthcheck` explicitly
+for its existing `service_healthy` startup dependency. Upgrading the old 0.5.0 overlay requires stopping
+traffic, backing up the complete `owlmail-mail` volume and any external Relay
+state, and rehearsing on an isolated copy with real outbound delivery disabled.
+See [0.13.0 compatibility and rollback](https://github.com/soulteary/owlmail/blob/v0.13.0/docs/en/Release-0.13.0.md#upgrade-compatibility-and-rollback): delivery is at least once; rollback restores the old image and matching complete backup, not shared writable state. Verify readiness, an actual WordPress SMTP capture, attachment reads and container recreation after upgrading:
 
 ```bash
 docker compose \

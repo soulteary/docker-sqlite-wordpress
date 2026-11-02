@@ -23,8 +23,14 @@ services:
       - WORDPRESS_SMTP_TIMEOUT
 
   owlmail:
-    image: ghcr.io/soulteary/owlmail:0.5.0
+    image: ghcr.io/soulteary/owlmail:0.13.0
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/app/owlmail", "healthcheck", "--container"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 5
     ports:
       # The SMTP listener stays private on the Compose network. Only the local
       # browser inbox is published to the host.
