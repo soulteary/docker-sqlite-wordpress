@@ -23,7 +23,7 @@ services:
       - WORDPRESS_SMTP_TIMEOUT
 
   owlmail:
-    image: ghcr.io/soulteary/owlmail:0.5.0
+    image: ghcr.io/soulteary/owlmail:0.13.0
     restart: unless-stopped
     ports:
       # The SMTP listener stays private on the Compose network. Only the local

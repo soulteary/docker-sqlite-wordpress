@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Pin the optional OwlMail SMTP overlay to 0.13.0, retaining private SMTP networking, the complete mail volume and configuration precedence. Document backup, durable Relay recovery and rollback requirements from the old 0.5.0 overlay.
+
 ## [2026.10.29-r1] - 2026-10-29
 
 ### Changed
