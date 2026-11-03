@@ -4,9 +4,11 @@
 
 WordPress with SQLite, ready to use out of the box.
 
-> <!-- release-availability: pending -->
-> **Release in preparation:** `2026.11.03-r1` bundles SQLite Database Integration
-> `3.1.3`. Build locally until registry publication and verification complete.
+> **Published release:** [`2026.11.03-r1`](https://github.com/soulteary/docker-sqlite-wordpress/releases/tag/2026.11.03-r1)
+> bundles SQLite Database Integration `3.1.3` and is available from Docker Hub
+> and GHCR as matching five-platform indexes at
+> `sha256:a0bd965cdfcfd48d882375652a7457630dc6bc39cd2b762623199f2b866918e6`.
+> Per-platform SBOM/provenance and both registry signatures passed verification.
 
 - Based on [official image](https://hub.docker.com/_/wordpress), Easier and more sustainable solution.
 - DockerHub Page: https://hub.docker.com/r/soulteary/sqlite-wordpress
