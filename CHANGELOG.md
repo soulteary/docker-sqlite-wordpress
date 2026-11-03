@@ -404,7 +404,11 @@
 - SQLite Database Integration 3.0.0 uses WAL journaling by default; keep the database, `-wal`, and `-shm` files on the same persistent volume.
 - The native `wp_mysql_parser` extension is built for amd64 and arm64. Other published platforms use the integration's pure-PHP parser fallback.
 
-[Unreleased]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.09.10-r1...HEAD
+[Unreleased]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.11.03-r1...HEAD
+[2026.11.03-r1]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.10.29-r1...2026.11.03-r1
+[2026.10.29-r1]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.10.22-r1...2026.10.29-r1
+[2026.10.22-r1]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.10.12-r1...2026.10.22-r1
+[2026.10.12-r1]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.09.10-r1...2026.10.12-r1
 [2026.09.10-r1]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.09.03-r1...2026.09.10-r1
 [2026.09.03-r1]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.09.02-r2...2026.09.03-r1
 [2026.09.02-r2]: https://github.com/soulteary/docker-sqlite-wordpress/compare/2026.09.02-r1...2026.09.02-r2

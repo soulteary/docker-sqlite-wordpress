@@ -4,7 +4,7 @@ Thank you for helping keep **Docker SQLite WordPress** and its users safe. This 
 
 ## Scope
 
-This project packages the official [WordPress image](https://hub.docker.com/_/wordpress) together with [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration), its optional native Rust accelerator `wp_mysql_parser`, and project-owned entrypoint, diagnostics, compatibility, and recovery components.
+This project packages the official [WordPress image](https://hub.docker.com/_/wordpress) together with [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration) and project-owned entrypoint, diagnostics, compatibility, SMTP, performance, and recovery components. Current images use the upstream PHP parser on every supported platform; the native Rust extension `wp_mysql_parser` was removed in SQLite Database Integration 3.1.2.
 
 This policy covers issues **introduced by this project**, including:
 
@@ -16,7 +16,8 @@ This policy covers issues **introduced by this project**, including:
 - The disabled-by-default, credential-protected
   `/tool-reset-user-password.php` endpoint and its independent persistent
   throttle/one-shot state handling.
-- The packaging and configuration of the native `wp_mysql_parser` extension.
+- The packaging and configuration of the SQLite integration and PHP parser.
+- The project-owned SMTP transport and performance display plugins.
 - The release workflows under `.github/workflows/`.
 
 The following are **out of scope** here and should be reported upstream:
