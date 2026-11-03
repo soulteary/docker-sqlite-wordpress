@@ -1,7 +1,8 @@
 services:
 
   wordpress:
-    build: .
+    build:
+      context: .
     image: sqlite-wordpress:main
     restart: always
     ports:
