@@ -92,7 +92,11 @@ intentional. Never push a release tag from a contributor build.
 
 ### Repository Tests
 
-Run the complete fast test set before opening a pull request:
+Run the fast test set below before opening a pull request. Use Linux with
+Bash 4+ and GNU coreutils for the shell checks, matching CI. The default macOS
+Bash and BSD utilities are insufficient (`mapfile`, case conversion, and GNU
+`chmod` options are used); on macOS, run these checks in a Linux development
+environment. PHP checks require the PHP CLI with PDO SQLite.
 
 ```bash
 bash tests/test-entrypoint-reconcile.sh
