@@ -74,7 +74,7 @@ docker run --rm -it -p 127.0.0.1:8080:80 \
 
 ### Multi-Arch Build
 
-This project supports `linux/amd64`, `linux/arm64`, `linux/arm/v7`, `linux/arm/v6`, and `linux/arm/v5`. SQLite Database Integration 3.1.2 uses the PHP parser on every platform; upstream removed the native Rust extension.
+This project supports `linux/amd64`, `linux/arm64`, `linux/arm/v7`, `linux/arm/v6`, and `linux/arm/v5`. SQLite Database Integration 3.1.3 uses the PHP parser on every platform; upstream removed the native Rust extension.
 
 Buildx cannot load a multi-platform result into the classic local Docker image
 store. Export an OCI archive explicitly when checking the complete platform
@@ -102,7 +102,7 @@ php tests/test-sqlite-select-id-key-fix.php
 php tests/test-tool-update-site-url.php
 php tests/test-tool-reset-user-password.php
 go install github.com/soulteary/ci-recipes/cmd/ci-recipes@83ccd6f83d7e7ef40f5d6faf2e11960f1de74a78
-ci-recipes docker-sqlite-wordpress validate-release 2026.10.29-r1
+ci-recipes docker-sqlite-wordpress validate-release 2026.11.03-r1
 ```
 
 To reproduce the remaining lint and configuration checks:

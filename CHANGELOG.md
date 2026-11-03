@@ -2,7 +2,14 @@
 
 ## [Unreleased]
 
+## [2026.11.03-r1] - 2026-11-03
+
 ### Changed
+
+- Upgrade SQLite Database Integration from 3.1.2 to 3.1.3, pinned to upstream
+  commit `f05c1f9eecf13ff2f387c4be8acf1ae3befaa537`.
+- Include upstream fixes for binary column defaults, identifier quoting, lexer
+  correctness, and reserved-prefix checks.
 
 - Pin the optional OwlMail SMTP overlay to 0.13.0, add an explicit native healthcheck for the existing service_healthy dependency, retaining private SMTP networking, the complete mail volume and configuration precedence. Document backup, durable Relay recovery and rollback requirements from the old 0.5.0 overlay.
 
