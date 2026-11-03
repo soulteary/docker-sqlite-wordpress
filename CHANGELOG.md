@@ -4,6 +4,12 @@
 
 ## [2026.11.03-r1] - 2026-11-03
 
+### Release status
+
+- Published matching five-platform indexes to Docker Hub and GHCR at
+  `sha256:a0bd965cdfcfd48d882375652a7457630dc6bc39cd2b762623199f2b866918e6`. SBOM, provenance, signatures,
+  and date/latest alias promotion passed verification.
+
 ### Changed
 
 - Upgrade SQLite Database Integration from 3.1.2 to 3.1.3, pinned to upstream
