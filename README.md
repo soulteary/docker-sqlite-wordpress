@@ -122,7 +122,7 @@ To override these defaults, mount a PHP configuration file that loads after
 services:
   wordpress:
     volumes:
-      - ./php/uploads.ini:/usr/local/etc/php/conf.d/z00-wordpress-uploads.ini:ro
+      - ./php/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
 ```
 
 For example, `php/uploads.ini` can contain:
