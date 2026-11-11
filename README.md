@@ -4,13 +4,10 @@
 
 WordPress with SQLite, ready to use out of the box.
 
-<!-- release-availability: pending -->
-> **Release candidate:** `2026.11.11-r1` is prepared but is not published yet.
-> The previous published release,
-> [`2026.11.03-r1`](https://github.com/soulteary/docker-sqlite-wordpress/releases/tag/2026.11.03-r1),
-> remains available from Docker Hub and GHCR at
-> `sha256:a0bd965cdfcfd48d882375652a7457630dc6bc39cd2b762623199f2b866918e6`.
-> Build current `main` to use the candidate before publication.
+> **Published release:** [`2026.11.11-r1`](https://github.com/soulteary/docker-sqlite-wordpress/releases/tag/2026.11.11-r1)
+> is available from Docker Hub and GHCR as matching five-platform indexes at
+> `sha256:3081fea3813932baeef817fea17c360b86f24e78ae16074ec90638b8211276bf`. Per-platform SBOM/provenance and
+> both registry signatures passed verification.
 
 - Based on [official image](https://hub.docker.com/_/wordpress), Easier and more sustainable solution.
 - DockerHub Page: https://hub.docker.com/r/soulteary/sqlite-wordpress
@@ -55,14 +52,6 @@ docker exec -it <container> ls -l /var/www/html/wp-content/mu-plugins/
 - [WordPress farewell to MySQL: Docker SQLite WordPress](https://soulteary.com/2024/04/17/say-goodbye-to-mysql-docker-sqlite-wordpress.html)
 
 ## Quick Start
-
-Until `2026.11.11-r1` is published, build the current repository:
-
-```bash
-docker build -t sqlite-wordpress:main .
-```
-
-The image commands below apply after publication.
 
 Pull the rolling tag for convenience or the immutable CalVer release for
 reproducible deployments:
