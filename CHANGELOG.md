@@ -23,8 +23,10 @@
 
 ### Release status
 
-- Prepared for publication. `2026.11.03-r1` remains the current published release
-  until this release has passed registry and signature verification.
+- Published matching five-platform indexes to Docker Hub and GHCR at
+  `sha256:3081fea3813932baeef817fea17c360b86f24e78ae16074ec90638b8211276bf`.
+  Per-platform SBOM, provenance, both registry signatures, and date/latest alias
+  promotion passed verification.
 
 ## [2026.11.03-r1] - 2026-11-03
 

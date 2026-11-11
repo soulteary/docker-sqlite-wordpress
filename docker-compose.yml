@@ -1,9 +1,7 @@
 services:
 
   wordpress:
-    image: sqlite-wordpress:main
-    build:
-      context: .
+    image: soulteary/sqlite-wordpress:2026.11.11-r1@sha256:3081fea3813932baeef817fea17c360b86f24e78ae16074ec90638b8211276bf
     restart: always
     ports:
       # Safe local default. Replace 127.0.0.1 only when intentionally publishing
