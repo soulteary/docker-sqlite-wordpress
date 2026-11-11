@@ -32,8 +32,28 @@ docker run --rm --platform "${platform}" --entrypoint php "${image}" -r '
   if (ini_get("session.use_strict_mode") !== "1") {
     throw new RuntimeException("Strict session mode must be enabled");
   }
-  printf("Verified PHP %s and session security controls\n", PHP_VERSION);
+  if (ini_parse_quantity(ini_get("upload_max_filesize")) !== 32 * 1024 * 1024) {
+    throw new RuntimeException("Default upload_max_filesize must be 32M");
+  }
+  if (ini_parse_quantity(ini_get("post_max_size")) !== 40 * 1024 * 1024) {
+    throw new RuntimeException("Default post_max_size must be 40M");
+  }
+  printf("Verified PHP %s, session controls, and upload limits\n", PHP_VERSION);
 '
+
+# A conventional operator-supplied INI file must override the image defaults.
+docker run --rm -i --platform "${platform}" --entrypoint sh "${image}" -s <<'SH'
+set -eu
+printf '%s\n' 'upload_max_filesize=64M' 'post_max_size=80M' > /usr/local/etc/php/conf.d/uploads.ini
+php <<'PHP'
+<?php
+if (ini_parse_quantity(ini_get('upload_max_filesize')) !== 64 * 1024 * 1024
+    || ini_parse_quantity(ini_get('post_max_size')) !== 80 * 1024 * 1024) {
+    throw new RuntimeException('Operator upload configuration did not override the defaults');
+}
+echo "Verified operator upload configuration override\n";
+PHP
+SH
 
 modules="$(docker run --rm --platform "${platform}" --entrypoint php "${image}" -m)"
 if [[ "${parser_mode}" == "native" ]]; then
@@ -135,6 +155,9 @@ docker run --rm --platform "${platform}" \
 # shellcheck disable=SC2016
 docker run --rm --platform "${platform}" "${image}" php -r '
   require "/var/www/html/wp-load.php";
+  if (wp_max_upload_size() !== 32 * 1024 * 1024) {
+    throw new RuntimeException("Default WordPress upload limit must be 32 MiB");
+  }
   if (!defined("DB_PATH") || !is_file(DB_PATH)) {
     throw new RuntimeException("Runtime DB_PATH is missing or invalid.");
   }
