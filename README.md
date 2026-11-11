@@ -116,13 +116,13 @@ single-site installation, WordPress reports a 32 MiB upload limit. The larger
 request limit leaves room for multipart form data.
 
 To override these defaults, mount a PHP configuration file that loads after
-`zz-uploads.ini`:
+`00-wordpress-uploads.ini`:
 
 ```yaml
 services:
   wordpress:
     volumes:
-      - ./php/uploads.ini:/usr/local/etc/php/conf.d/zzz-uploads.ini:ro
+      - ./php/uploads.ini:/usr/local/etc/php/conf.d/z00-wordpress-uploads.ini:ro
 ```
 
 For example, `php/uploads.ini` can contain:

@@ -41,6 +41,20 @@ docker run --rm --platform "${platform}" --entrypoint php "${image}" -r '
   printf("Verified PHP %s, session controls, and upload limits\n", PHP_VERSION);
 '
 
+# A conventional operator-supplied INI file must override the image defaults.
+docker run --rm -i --platform "${platform}" --entrypoint sh "${image}" -s <<'SH'
+set -eu
+printf '%s\n' 'upload_max_filesize=64M' 'post_max_size=80M' > /usr/local/etc/php/conf.d/uploads.ini
+php <<'PHP'
+<?php
+if (ini_parse_quantity(ini_get('upload_max_filesize')) !== 64 * 1024 * 1024
+    || ini_parse_quantity(ini_get('post_max_size')) !== 80 * 1024 * 1024) {
+    throw new RuntimeException('Operator upload configuration did not override the defaults');
+}
+echo "Verified operator upload configuration override\n";
+PHP
+SH
+
 modules="$(docker run --rm --platform "${platform}" --entrypoint php "${image}" -m)"
 if [[ "${parser_mode}" == "native" ]]; then
 	grep -Fxq wp_mysql_parser <<< "${modules}"

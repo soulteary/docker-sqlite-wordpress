@@ -65,7 +65,7 @@ FROM ${WORDPRESS_IMAGE}
 RUN php -r 'if (PHP_MAJOR_VERSION !== 8 || PHP_MINOR_VERSION !== 5 || version_compare(PHP_VERSION, "8.5.12", "<")) { fwrite(STDERR, "PHP 8.5.12+ required for CVE-2026-109618/109619\n"); exit(1); }'
 # Defense in depth; not a substitute for the PHP patch.
 RUN printf '%s\n' 'session.upload_progress.enabled=Off' 'session.use_strict_mode=1' > /usr/local/etc/php/conf.d/zz-session-security.ini
-RUN printf '%s\n' 'upload_max_filesize=32M' 'post_max_size=40M' > /usr/local/etc/php/conf.d/zz-uploads.ini
+RUN printf '%s\n' 'upload_max_filesize=32M' 'post_max_size=40M' > /usr/local/etc/php/conf.d/00-wordpress-uploads.ini
 ARG IMAGE_VERSION
 ARG IMAGE_REVISION
 ARG WORDPRESS_VERSION

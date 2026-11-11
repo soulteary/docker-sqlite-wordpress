@@ -18,7 +18,7 @@
   WordPress content or database changes are required.
 - Custom PHP configuration, WordPress filters, multisite settings, plugins, or
   reverse proxies may impose lower limits. A file mounted after
-  `zz-uploads.ini` can override the image defaults.
+  `00-wordpress-uploads.ini` can override the image defaults.
 - WordPress, PHP base image, and SQLite Database Integration pins are unchanged.
 
 ### Release status
