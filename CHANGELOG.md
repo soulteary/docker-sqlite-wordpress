@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2026.11.19-r1] - 2026-11-19
+
 ### Security
 
 - Update the source image to WordPress 7.1.5, including the November 18
