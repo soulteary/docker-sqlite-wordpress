@@ -14,9 +14,16 @@ WordPress with SQLite, ready to use out of the box.
 - GHCR Page: https://github.com/soulteary/docker-sqlite-wordpress/pkgs/container/sqlite-wordpress
 - Uses the upstream PHP MySQL parser on all supported architectures.
 
+<!-- release-availability: pending -->
+> **Unreleased candidate:** `soulteary/sqlite-wordpress:2026.11.19-r1` upgrades the
+> source build to WordPress 7.1.5 and refreshes the pinned official PHP 8.5
+> Apache base. The tag has not been published; the repository Compose file
+> builds `sqlite-wordpress:main` locally until release validation completes.
+> The published release and pull examples below remain at `2026.11.11-r1`.
+
 ## MySQL Parser
 
-The image bundles WordPress `7.1.3` on PHP 8.5/Apache and
+The image bundles WordPress `7.1.5` on PHP 8.5/Apache and
 [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration)
 `v3.1.3`. Upstream removed the optional Rust extension `wp_mysql_parser` in
 3.1.2; all five supported platforms now use the PHP parser.
@@ -556,8 +563,8 @@ refuses Multisite installations.
 
 ## Volume and Upgrade Notes
 
-Back up `wp-content/database/` before upgrading an existing site to the
-WordPress 7.1.3 / SQLite Database Integration 3.1.3 image. The v3 integration
+Back up `wp-content/database/` before upgrading an existing site to a new
+WordPress / SQLite Database Integration image. The v3 integration
 requires a non-empty `DB_NAME` in custom `wp-config.php` files and uses WAL
 journaling by default, so the database's `-wal` and `-shm` sidecar files must
 remain on the same persistent volume as the main SQLite file.
@@ -591,8 +598,8 @@ local archive. The standard `Core_Upgrader` still performs the update and its
 normal checks; `wp-content` is never included in the archive.
 
 Stable versions that differ only by trailing
-zero components are treated as equivalent. An offer for `7.1.3` resolves to
-`/usr/src/wordpress-upgrades/wordpress-7.1.3-no-content.zip`. Pre-release and
+zero components are treated as equivalent. For the pending 7.1.5 image, an offer for `7.1.5` resolves to
+`/usr/src/wordpress-upgrades/wordpress-7.1.5-no-content.zip`. Pre-release and
 non-numeric version offers are never redirected to a local package.
 
 After changing the image, back up the full site and database, recreate the

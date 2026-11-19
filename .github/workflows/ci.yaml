@@ -148,10 +148,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          image="wordpress:7.1.3-php8.5-apache"
+          image="wordpress:7.1.5-php8.5-apache"
           docker buildx imagetools inspect "${image}"
           digest="$(docker buildx imagetools inspect "${image}" --format '{{json .Manifest}}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["digest"])')"
           echo "Candidate pinned image: ${image}@${digest}"
+          docker run --rm --platform linux/amd64 "${image}@${digest}" sh -ec '
+            . /etc/os-release
+            echo "Base OS: ${PRETTY_NAME}"
+            dpkg-query -W apache2 apache2-bin
+            apache2ctl -M 2>&1 | tee /tmp/apache-modules.txt
+            if grep -Eq "^[[:space:]]*http2_module[[:space:]]" /tmp/apache-modules.txt; then
+              echo "Unexpected enabled mod_http2 in the upstream Apache base" >&2
+              exit 1
+            fi
+          '
           docker run --rm --platform linux/amd64 "${image}@${digest}" php -r '
             printf("PHP_VERSION=%s\\n", PHP_VERSION);
             if (PHP_MAJOR_VERSION !== 8 || PHP_MINOR_VERSION !== 5 || version_compare(PHP_VERSION, "8.5.12", "<")) exit(1);
