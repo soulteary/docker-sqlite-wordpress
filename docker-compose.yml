@@ -2,7 +2,8 @@ services:
 
   wordpress:
     image: sqlite-wordpress:main
-    build: .
+    build:
+      context: .
     restart: always
     ports:
       # Safe local default. Replace 127.0.0.1 only when intentionally publishing
