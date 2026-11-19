@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Security
+
+- Update the source image to WordPress 7.1.5, including the November 18
+  security fixes, while retaining PHP 8.5 and SQLite Database Integration 3.1.3.
+- Refresh the pinned official WordPress 7.1.5 / PHP 8.5 Apache base manifest.
+- Inspect upstream Apache modules in CI and reject an enabled HTTP/2 module
+  in the default Apache configuration.
+
+### Upgrade notes
+
+- This is an unreleased candidate. Build and test before publishing an immutable tag.
+- Back up the complete site and SQLite database directory, including WAL/SHM
+  sidecars, then recreate the container.
+- An existing full-docroot volume retains its installed WordPress core until
+  the normal updater applies the matching bundled 7.1.5 package.
+- CVE-2026-119618 affects Apache mod_http2; the default PHP Apache prefork
+  image does not enable that module. Verify custom Apache configurations.
+
+
 ## [2026.11.11-r1] - 2026-11-11
 
 ### Fixed
