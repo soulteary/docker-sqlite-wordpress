@@ -23,7 +23,7 @@ WordPress with SQLite, ready to use out of the box.
 
 ## MySQL Parser
 
-The published image bundles WordPress `7.1.3` on PHP 8.5/Apache and
+The image bundles WordPress `7.1.5` on PHP 8.5/Apache and
 [`sqlite-database-integration`](https://github.com/WordPress/sqlite-database-integration)
 `v3.1.3`. Upstream removed the optional Rust extension `wp_mysql_parser` in
 3.1.2; all five supported platforms now use the PHP parser.
