@@ -15,11 +15,12 @@ WordPress with SQLite, ready to use out of the box.
 - Uses the upstream PHP MySQL parser on all supported architectures.
 
 <!-- release-availability: pending -->
-> **Unreleased candidate:** `soulteary/sqlite-wordpress:2026.11.19-r1` upgrades the
-> source build to WordPress 7.1.5 and refreshes the pinned official PHP 8.5
-> Apache base. The tag has not been published; the repository Compose file
-> builds `sqlite-wordpress:main` locally until release validation completes.
-> The published release and pull examples below remain at `2026.11.11-r1`.
+> **Release candidate:** `soulteary/sqlite-wordpress:2026.11.26-r1` uses the pinned
+> official PHP 8.5.13 Apache base with WordPress 7.1.5 and SQLite Database
+> Integration 3.1.3. The repository Compose file builds `sqlite-wordpress:main`
+> locally until publication verification completes. A historical GitHub Release
+> exists for `2026.11.19-r1`; it must not be treated as an unpublished candidate.
+> The verified `2026.11.11-r1` deployment examples below remain available for rollback.
 
 ## MySQL Parser
 

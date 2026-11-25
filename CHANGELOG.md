@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [2026.11.26-r1] - 2026-11-26
+
+### Changed
+
+- Rebuild against the pinned official PHP 8.5.13 Apache base digest.
+- Keep WordPress 7.1.5, SQLite Database Integration 3.1.3 and all five runtime platforms.
+- Refresh CI and release Actions dependencies.
+
+### Upgrade
+
+- Back up the document root and SQLite database with WAL/SHM sidecars, then recreate the container.
+- Existing full-docroot volumes need a separate WordPress core update through the standard updater.
+- Restore the previous exact image and backup to roll back.
+
 ## [2026.11.19-r1] - 2026-11-19
 
 ### Security
@@ -14,7 +28,7 @@
 
 ### Upgrade notes
 
-- This is an unreleased candidate. Build and test before publishing an immutable tag.
+- The GitHub Release exists for this historical version; verify its registry artifacts before deployment.
 - Back up the complete site and SQLite database directory, including WAL/SHM
   sidecars, then recreate the container.
 - An existing full-docroot volume retains its installed WordPress core until

@@ -1,6 +1,6 @@
 # plugin: https://github.com/WordPress/sqlite-database-integration
 # SQLite Database Integration 3.1.3 uses its PHP parser on every platform.
-ARG IMAGE_VERSION=2026.11.19-r1
+ARG IMAGE_VERSION=2026.11.26-r1
 ARG IMAGE_REVISION=unknown
 ARG WORDPRESS_VERSION=7.1.5
 # Official multi-architecture digest; its image configuration identifies PHP 8.5.13.
