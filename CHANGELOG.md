@@ -16,6 +16,14 @@
 - Existing full-docroot volumes need a separate WordPress core update through the standard updater.
 - Restore the previous exact image and backup to roll back.
 
+### Release status
+
+- Published matching Docker Hub and GHCR indexes at `sha256:622f0892a27f9fbe3f458de229e6fd2b4dcc45e6528d409377d7978e796b4991`.
+- Verified Linux amd64, arm64, ARMv5, ARMv6 and ARMv7, source annotations,
+  per-platform SBOM/provenance and both registry signatures.
+- Date and latest alias promotion passed. Image source: `3f33a9185265243c57fcc3f12a099da20d6a55f3`.
+
+
 ## [2026.11.19-r1] - 2026-11-19
 
 ### Security

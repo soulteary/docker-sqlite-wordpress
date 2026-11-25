@@ -1,7 +1,7 @@
 services:
 
   wordpress:
-    image: sqlite-wordpress:main
+    image: soulteary/sqlite-wordpress:2026.11.26-r1
     build:
       context: .
     restart: always
